@@ -174,10 +174,27 @@ const Products: React.FC = () => {
               Atualizar
             </Button>
             {(userRole === 'admin' || userRole === 'comercial') && (
-              <Button size="sm" onClick={() => handleOpenModal()}>
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Produto
-              </Button>
+              <>
+                <Button variant="outline" size="sm" onClick={async () => {
+                  if (!confirm('Deseja restaurar os produtos padrão? Isso adicionará produtos básicos se eles não existirem.')) return;
+                  try {
+                    const toastId = toast.loading('Restaurando produtos...');
+                    await productsService.seedDefaultProducts();
+                    await fetchProducts();
+                    toast.dismiss(toastId);
+                    toast.success('Produtos restaurados com sucesso!');
+                  } catch (error) {
+                    toast.error('Erro ao restaurar produtos');
+                  }
+                }}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Restaurar Padrões
+                </Button>
+                <Button size="sm" onClick={() => handleOpenModal()}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Novo Produto
+                </Button>
+              </>
             )}
           </div>
         </div>
