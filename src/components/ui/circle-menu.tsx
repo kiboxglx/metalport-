@@ -34,24 +34,24 @@ export const CircleMenu = ({ items }: FloatingMenuProps) => {
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.8 }}
                         transition={{ duration: 0.2 }}
-                        className="absolute bottom-20 right-0 flex flex-col gap-3 pointer-events-none"
+                        className="absolute bottom-16 left-1/2 -translate-x-1/2 flex flex-col gap-2 pointer-events-none items-center"
                     >
                         {items.map((item, index) => (
                             <motion.a
                                 key={item.href}
                                 href={item.href}
-                                initial={{ opacity: 0, x: 20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: 20 }}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 10 }}
                                 transition={{ delay: index * 0.05 }}
-                                className="flex items-center gap-3 bg-white dark:bg-gray-800 px-4 py-3 rounded-full shadow-lg hover:shadow-xl transition-all group pointer-events-auto"
-                                whileHover={{ scale: 1.05, x: -5 }}
+                                className="flex items-center gap-2 bg-white dark:bg-gray-800 px-3 py-2 rounded-full shadow-lg hover:shadow-xl transition-all group pointer-events-auto min-w-[140px]"
+                                whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
                             >
-                                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors">
+                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors">
                                     {item.icon}
                                 </div>
-                                <span className="text-sm font-medium text-foreground whitespace-nowrap pr-2">
+                                <span className="text-xs font-medium text-foreground whitespace-nowrap pr-1">
                                     {item.label}
                                 </span>
                             </motion.a>
@@ -64,7 +64,7 @@ export const CircleMenu = ({ items }: FloatingMenuProps) => {
             <motion.button
                 onClick={() => setIsOpen(!isOpen)}
                 className={cn(
-                    "w-16 h-16 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300",
+                    "w-12 h-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300",
                     "bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70",
                     "text-white hover:shadow-primary/50",
                     isOpen && "rotate-90"
@@ -81,7 +81,7 @@ export const CircleMenu = ({ items }: FloatingMenuProps) => {
                             exit={{ rotate: 90, opacity: 0 }}
                             transition={{ duration: 0.2 }}
                         >
-                            <X size={24} />
+                            <X size={20} />
                         </motion.div>
                     ) : (
                         <motion.div
@@ -91,7 +91,7 @@ export const CircleMenu = ({ items }: FloatingMenuProps) => {
                             exit={{ rotate: -90, opacity: 0 }}
                             transition={{ duration: 0.2 }}
                         >
-                            <Menu size={24} />
+                            <Menu size={20} />
                         </motion.div>
                     )}
                 </AnimatePresence>
