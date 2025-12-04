@@ -601,7 +601,7 @@ const RentalDetail: React.FC = () => {
               {/* Ongoing -> Collecting */}
               {rental.status === 'ongoing' && (
                 <Button
-                  onClick={() => handleStatusChange('collecting')}
+                  onClick={() => navigate(`/alugueis/${rental.id}/finalizacao`)}
                   disabled={updatingStatus}
                   className="w-full gap-2 mb-2 bg-orange-600 hover:bg-orange-700"
                 >
