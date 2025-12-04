@@ -140,6 +140,78 @@ export const rentalsService = {
     return data as unknown as Rental;
   },
 
+  async finalizeRental(id: string): Promise<void> {
+    // 1. Get checklist items to determine quantity to restore
+    const { data: checklistItems, error: checklistError } = await supabase
+      .from('rental_checklist')
+      .select('product_id, quantity_collected')
+      .eq('rental_id', id);
+
+    if (checklistError) throw checklistError;
+
+    // 2. Restore stock based on collected quantity
+    if (checklistItems && checklistItems.length > 0) {
+      for (const item of checklistItems) {
+        if (item.quantity_collected > 0 && item.product_id) {
+          // Get current stock
+          const { data: product, error: productError } = await supabase
+            .from('products')
+            .select('total_stock')
+            .eq('id', item.product_id)
+            .single();
+
+          if (productError) {
+            console.error(`Error fetching product ${item.product_id} for stock restoration`, productError);
+            continue;
+          }
+
+          // Update stock
+          const { error: updateError } = await supabase
+            .from('products')
+            .update({ total_stock: product.total_stock + item.quantity_collected })
+            .eq('id', item.product_id);
+
+          if (updateError) {
+            console.error(`Error restoring stock for product ${item.product_id}`, updateError);
+          }
+        }
+      }
+    } else {
+      // Fallback: if no checklist, restore original rented quantity
+      const { data: rentalItems, error: itemsError } = await supabase
+        .from('rental_product_items')
+        .select('product_id, quantity')
+        .eq('rental_id', id);
+
+      if (itemsError) throw itemsError;
+
+      if (rentalItems) {
+        for (const item of rentalItems) {
+          const { data: product, error: productError } = await supabase
+            .from('products')
+            .select('total_stock')
+            .eq('id', item.product_id)
+            .single();
+
+          if (!productError && product) {
+            await supabase
+              .from('products')
+              .update({ total_stock: product.total_stock + item.quantity })
+              .eq('id', item.product_id);
+          }
+        }
+      }
+    }
+
+    // 3. Update rental status to finished
+    const { error: statusError } = await supabase
+      .from('rentals')
+      .update({ status: 'finished' })
+      .eq('id', id);
+
+    if (statusError) throw statusError;
+  },
+
   async deleteRental(id: string): Promise<void> {
     // Delete rental product items
     const { error: productItemsError } = await supabase

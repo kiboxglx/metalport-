@@ -139,7 +139,11 @@ const RentalDetail: React.FC = () => {
 
     try {
       setUpdatingStatus(true);
-      await rentalsService.updateRentalStatus(id, newStatus as any);
+      if (newStatus === 'finished') {
+        await rentalsService.finalizeRental(id);
+      } else {
+        await rentalsService.updateRentalStatus(id, newStatus as any);
+      }
       await loadRental(id);
 
       const statusLabel = STATUS_CONFIG[newStatus]?.label || newStatus;

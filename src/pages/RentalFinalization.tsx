@@ -102,8 +102,8 @@ const RentalFinalization: React.FC = () => {
         try {
             setProcessing(true);
 
-            // Update rental status to finished
-            await rentalsService.updateRentalStatus(id, 'finished');
+            // Update rental status to finished and restore stock
+            await rentalsService.finalizeRental(id);
 
             toast.success('Contrato finalizado com sucesso!');
 
@@ -252,8 +252,8 @@ const RentalFinalization: React.FC = () => {
                                         >
                                             <Star
                                                 className={`h-8 w-8 ${rating <= customerRating
-                                                        ? 'fill-yellow-400 text-yellow-400'
-                                                        : 'text-gray-300'
+                                                    ? 'fill-yellow-400 text-yellow-400'
+                                                    : 'text-gray-300'
                                                     }`}
                                             />
                                         </button>
