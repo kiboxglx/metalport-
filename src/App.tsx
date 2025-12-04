@@ -18,6 +18,8 @@ import Rentals from './pages/Rentals';
 import NewRental from './pages/NewRental';
 import RentalDetail from './pages/RentalDetail';
 import EditRental from './pages/EditRental';
+import RentalPayment from './pages/RentalPayment';
+import RentalFinalization from './pages/RentalFinalization';
 import CalendarView from './pages/CalendarView';
 import Financial from './pages/Financial';
 import Users from './pages/Users';
@@ -25,6 +27,7 @@ import Contracts from './pages/Contracts';
 import Products from './pages/Products';
 import Auth from './pages/Auth';
 import Settings from './pages/Settings';
+import TestPDF from './pages/TestPDF';
 
 // Context providers for global state management
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -104,6 +107,8 @@ function AppContent() {
             }
           />
           <Route path="/alugueis/:id" element={<RentalDetail />} />
+          <Route path="/alugueis/:id/pagamento" element={<RentalPayment />} />
+          <Route path="/alugueis/:id/finalizacao" element={<RentalFinalization />} />
           <Route
             path="/alugueis/editar/:id"
             element={
@@ -161,6 +166,7 @@ function AppContent() {
           <Route path="/eventos" element={<EventsView />} />
           <Route path="/agenda" element={<ScheduleView />} />
           <Route path="/ordens-servico" element={<ServiceOrdersView />} />
+          <Route path="/test-pdf" element={<TestPDF />} />
 
           {/* Catch-all redirect to home */}
           <Route path="*" element={<Navigate to="/" replace />} />

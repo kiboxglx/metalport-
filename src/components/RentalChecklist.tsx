@@ -30,7 +30,7 @@ const RentalChecklist: React.FC<RentalChecklistProps> = ({ rentalId, onComplete 
       // Generate checklist if it doesn't exist
       const items = await checklistService.generateChecklistFromRental(rentalId);
       setChecklist(items);
-      
+
       // Initialize quantities
       const quantities: Record<string, number> = {};
       items.forEach(item => {
@@ -53,7 +53,7 @@ const RentalChecklist: React.FC<RentalChecklistProps> = ({ rentalId, onComplete 
 
     try {
       const quantity = itemQuantities[item.id] || item.quantity_expected;
-      
+
       if (item.collected) {
         // Unmark as collected
         await checklistService.updateChecklistItem(item.id, {
@@ -65,7 +65,7 @@ const RentalChecklist: React.FC<RentalChecklistProps> = ({ rentalId, onComplete 
       } else {
         // Mark as collected
         await checklistService.markAsCollected(item.id, collectorName, quantity);
-        
+
         // Save notes if any
         if (itemNotes[item.id]) {
           await checklistService.updateChecklistItem(item.id, {
@@ -73,7 +73,7 @@ const RentalChecklist: React.FC<RentalChecklistProps> = ({ rentalId, onComplete 
           });
         }
       }
-      
+
       await loadChecklist();
       toast.success(item.collected ? 'Item desmarcado' : 'Item coletado com sucesso');
     } catch (error) {
@@ -115,7 +115,7 @@ const RentalChecklist: React.FC<RentalChecklistProps> = ({ rentalId, onComplete 
             {collectedCount} de {checklist.length} itens coletados
           </p>
         </div>
-        
+
         {allCollected && (
           <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-2 rounded-lg">
             <CheckCircle2 className="w-5 h-5" />
@@ -140,7 +140,7 @@ const RentalChecklist: React.FC<RentalChecklistProps> = ({ rentalId, onComplete 
 
       {/* Progress Bar */}
       <div className="w-full bg-muted rounded-full h-2">
-        <div 
+        <div
           className="bg-primary h-2 rounded-full transition-all duration-300"
           style={{ width: `${(collectedCount / checklist.length) * 100}%` }}
         />
@@ -149,23 +149,21 @@ const RentalChecklist: React.FC<RentalChecklistProps> = ({ rentalId, onComplete 
       {/* Checklist Items */}
       <div className="space-y-3">
         {checklist.map((item) => (
-          <div 
-            key={item.id} 
-            className={`border rounded-lg p-4 transition-all ${
-              item.collected 
-                ? 'bg-emerald-50 border-emerald-200' 
-                : 'bg-card border-border hover:border-primary/50'
-            }`}
+          <div
+            key={item.id}
+            className={`border rounded-lg p-4 transition-all ${item.collected
+              ? 'bg-emerald-50 border-emerald-200'
+              : 'bg-card border-border hover:border-primary/50'
+              }`}
           >
             <div className="flex items-start gap-4">
               {/* Checkbox */}
               <button
                 onClick={() => handleToggleItem(item)}
-                className={`flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                  item.collected
-                    ? 'bg-emerald-500 border-emerald-500 text-white'
-                    : 'border-muted-foreground hover:border-primary'
-                }`}
+                className={`flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${item.collected
+                  ? 'bg-emerald-500 border-emerald-500 text-white'
+                  : 'border-muted-foreground hover:border-primary'
+                  }`}
               >
                 {item.collected && <CheckCircle2 className="w-4 h-4" />}
               </button>
@@ -176,15 +174,14 @@ const RentalChecklist: React.FC<RentalChecklistProps> = ({ rentalId, onComplete 
                   <h4 className={`font-medium ${item.collected ? 'text-emerald-700 line-through' : 'text-foreground'}`}>
                     {item.product?.name || 'Produto'}
                   </h4>
-                  <span className={`text-sm px-2 py-0.5 rounded-full w-fit ${
-                    item.collected 
-                      ? 'bg-emerald-100 text-emerald-700' 
-                      : 'bg-primary/10 text-primary'
-                  }`}>
+                  <span className={`text-sm px-2 py-0.5 rounded-full w-fit ${item.collected
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-primary/10 text-primary'
+                    }`}>
                     Qtd: {item.collected ? item.quantity_collected : item.quantity_expected}
                   </span>
                 </div>
-                
+
                 {item.product?.description && (
                   <p className="text-sm text-muted-foreground mt-1">{item.product.description}</p>
                 )}

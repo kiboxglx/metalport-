@@ -91,9 +91,15 @@ const Clients: React.FC = () => {
   };
 
   const handleAddClient = async () => {
-    if (!validateForm()) return;
+    console.log('handleAddClient started', formData);
+    if (!validateForm()) {
+      console.log('Validation failed', formErrors);
+      return;
+
+    }
 
     setIsSubmitting(true);
+    console.log('Submitting client...');
 
     try {
       const newClient: CustomerInsert = {
@@ -103,11 +109,13 @@ const Clients: React.FC = () => {
         document: formData.document.trim() || null,
         address: formData.address.trim() || null,
         rg: formData.rg.trim() || null,
-        cpf: formData.document.trim() || null, // Mapping document to CPF for now as they are often same field
+        cpf: formData.document.trim() || null,
         notes: formData.notes.trim() || null,
       };
 
+      console.log('Calling addClient with:', newClient);
       await addClient(newClient);
+      console.log('Client added successfully');
 
       setIsAddDialogOpen(false);
       setFormData(initialFormState);
@@ -117,10 +125,11 @@ const Clients: React.FC = () => {
         title: 'Cliente adicionado',
         description: `${newClient.name} foi adicionado com sucesso.`,
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error adding client:', error);
       toast({
-        title: 'Erro',
-        description: 'Falha ao adicionar cliente.',
+        title: 'Erro ao adicionar cliente',
+        description: `Detalhes: ${error.message || JSON.stringify(error)}`,
         variant: 'destructive',
       });
     } finally {
@@ -437,33 +446,55 @@ const Clients: React.FC = () => {
                     {clientRentals.map(rental => (
                       <div
                         key={rental.id}
-                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-secondary/20 cursor-pointer transition-colors"
+                        className="flex flex-col p-3 border rounded-lg hover:bg-secondary/20 cursor-pointer transition-colors gap-2"
                         onClick={() => {
                           setDetailDialogOpen(false);
                           navigate(`/alugueis/${rental.id}`);
                         }}
                       >
-                        <div>
-                          <p className="font-medium text-sm">
-                            {format(parseISO(rental.start_date), 'dd/MM/yyyy')} - {format(parseISO(rental.end_date), 'dd/MM/yyyy')}
-                          </p>
-                          <p className={`text-xs mt-1 font-medium
-                            ${rental.status === 'confirmed' ? 'text-green-600' :
-                              rental.status === 'pending' ? 'text-yellow-600' :
-                                rental.status === 'cancelled' ? 'text-red-600' : 'text-muted-foreground'}
-                          `}>
-                            Status: {rental.status === 'confirmed' ? 'Aprovado' :
-                              rental.status === 'pending' ? 'Pagamento Pendente' :
-                                rental.status === 'cancelled' ? 'Cancelado' : rental.status}
-                          </p>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium text-sm">
+                              {format(parseISO(rental.start_date), 'dd/MM/yyyy')} - {format(parseISO(rental.end_date), 'dd/MM/yyyy')}
+                            </p>
+                            <p className={`text-xs mt-1 font-medium
+                              ${rental.status === 'confirmed' ? 'text-green-600' :
+                                rental.status === 'pending' ? 'text-yellow-600' :
+                                  rental.status === 'cancelled' ? 'text-red-600' : 'text-muted-foreground'}
+                            `}>
+                              Status: {rental.status === 'confirmed' ? 'Aprovado' :
+                                rental.status === 'pending' ? 'Pagamento Pendente' :
+                                  rental.status === 'cancelled' ? 'Cancelado' : rental.status}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold text-sm">
+                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(rental.total_value)}
+                            </p>
+                            <Button variant="link" size="sm" className="h-auto p-0 text-xs">
+                              Ver Detalhes
+                            </Button>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="font-bold text-sm">
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(rental.total_value)}
-                          </p>
-                          <Button variant="link" size="sm" className="h-auto p-0 text-xs">
-                            Ver Detalhes
-                          </Button>
+
+                        {/* Items Summary */}
+                        <div className="text-xs text-muted-foreground bg-secondary/30 p-2 rounded">
+                          <p className="font-semibold mb-1">Itens:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {(rental as any).rental_product_items?.map((item: any, idx: number) => (
+                              <span key={`prod-${idx}`} className="bg-background px-1.5 py-0.5 rounded border">
+                                {item.quantity}x {item.product?.name}
+                              </span>
+                            ))}
+                            {(rental as any).rental_items?.map((item: any, idx: number) => (
+                              <span key={`tent-${idx}`} className="bg-background px-1.5 py-0.5 rounded border">
+                                {item.quantity}x {item.tent?.name || 'Tenda'}
+                              </span>
+                            ))}
+                            {(!(rental as any).rental_product_items?.length && !(rental as any).rental_items?.length) && (
+                              <span>Nenhum item registrado</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}

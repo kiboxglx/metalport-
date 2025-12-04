@@ -34,7 +34,7 @@ export const generateRentalPDF = async ({ rental, items }: RentalPDFData): Promi
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 15;
   const contentWidth = pageWidth - (margin * 2);
-  
+
   // Colors
   const black: [number, number, number] = [0, 0, 0];
 
@@ -87,28 +87,28 @@ export const generateRentalPDF = async ({ rental, items }: RentalPDFData): Promi
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.text('Locatário', margin, yPos);
-  
+
   yPos += 6;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.text(rental.customer?.name || 'N/A', margin, yPos);
-  
+
   // Customer details
   yPos += 5;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  
+
   let customerDetails = '';
   if (rental.customer?.document) {
     customerDetails += `Portador do CPF: ${rental.customer.document}`;
   }
-  
+
   if (customerDetails) {
     const splitDetails = doc.splitTextToSize(customerDetails, contentWidth);
     doc.text(splitDetails, margin, yPos);
     yPos += splitDetails.length * 4;
   }
-  
+
   if (rental.customer?.phone) {
     yPos += 1;
     doc.text(`Telefone de contato: ${rental.customer.phone}`, margin, yPos);
@@ -125,18 +125,18 @@ export const generateRentalPDF = async ({ rental, items }: RentalPDFData): Promi
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.text('1º', margin, yPos);
-  
+
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   const clause1Text = 'A LOCADORA proprietária dos equipamentos abaixo descritos, aluga ao(a) LOCATÁRIO(A). Nas condições e prazos estabelecidos:';
   doc.text(clause1Text, margin + 10, yPos);
-  
+
   yPos += 10;
 
   // Build items from rental data if not provided
   const days = Math.max(1, differenceInDays(new Date(rental.end_date), new Date(rental.start_date)) + 1);
   const tableItems = items || [];
-  
+
   // If no items provided, create a placeholder row
   if (tableItems.length === 0) {
     tableItems.push({
@@ -211,7 +211,7 @@ export const generateRentalPDF = async ({ rental, items }: RentalPDFData): Promi
 
   // Period
   doc.text(`Período de Locação: ${format(new Date(rental.start_date), 'dd/MM/yyyy')} a ${format(new Date(rental.end_date), 'dd/MM/yyyy')}`, margin, yPos);
-  
+
   yPos += 6;
 
   // Value in words
@@ -270,7 +270,7 @@ export const generateRentalPDF = async ({ rental, items }: RentalPDFData): Promi
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.text(clause.number, margin, yPos);
-    
+
     doc.setFont('helvetica', 'normal');
     const splitText = doc.splitTextToSize(clause.text, contentWidth - 8);
     doc.text(splitText, margin + 8, yPos);
@@ -292,7 +292,7 @@ export const generateRentalPDF = async ({ rental, items }: RentalPDFData): Promi
       doc.addPage();
       yPos = margin;
     }
-    
+
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.text('Observações:', margin, yPos);
@@ -349,9 +349,30 @@ export const generateRentalPDF = async ({ rental, items }: RentalPDFData): Promi
   doc.setFont('helvetica', 'bold');
   doc.text('TESTEMUNHA', signatureX + signatureWidth, yPos, { align: 'right' });
 
-  // Save the PDF
+  // Save the PDF via Blob
   const fileName = `Contrato_${rental.id.slice(0, 8).toUpperCase()}_${format(new Date(), 'yyyyMMdd')}.pdf`;
-  doc.save(fileName);
+  savePdfBlob(doc, fileName);
+};
+
+// Helper function to force download via Blob
+const savePdfBlob = (doc: jsPDF, filename: string) => {
+  try {
+    console.log('Tentando salvar PDF via Blob com nome:', filename);
+    const blob = doc.output('blob');
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    console.log('Download iniciado via Blob');
+  } catch (error) {
+    console.error('Erro ao salvar Blob:', error);
+    // Fallback to default save if blob fails
+    doc.save(filename);
+  }
 };
 
 // Load image helper

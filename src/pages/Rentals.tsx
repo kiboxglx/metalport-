@@ -3,8 +3,10 @@ import { Search, Eye, Calendar, User, Trash2, Plus, FileDown, X, Edit } from 'lu
 import { Rental, RentalInsert, RentalProductItemInsert } from '@/types/database';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Card } from '@/components/common/Card';
+import { MobileCard, MobileCardHeader, MobileCardContent, MobileCardFooter, MobileCardActions } from '@/components/ui/mobile-card';
+import { MobileActionButton, MobileIconButton } from '@/components/ui/mobile-buttons';
 import { StatusBadge } from '@/components/common/StatusBadge';
-import { format, differenceInDays } from 'date-fns';
+import { format, differenceInDays, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAlugueis } from '@/contexts/AlugueisContext';
 import { useClientes } from '@/contexts/ClientesContext';
@@ -13,6 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { useNavigate } from 'react-router-dom';
 import { generateRentalPDF } from '@/utils/generateRentalPDF';
+import { DatePicker } from '@/components/ui/date-picker';
 import {
   Dialog,
   DialogContent,
@@ -217,7 +220,7 @@ const Rentals: React.FC = () => {
 
       const selectedCustomer = clientsList.find(c => c.id === formData.customerId);
 
-      await addRental(rentalData, [], selectedCustomer, [], productItems, productsList);
+      await addRental(rentalData, selectedCustomer, productItems, productsList);
 
       setIsAddDialogOpen(false);
       setFormData(initialFormState);
@@ -234,7 +237,8 @@ const Rentals: React.FC = () => {
         `Aluguel criado para ${selectedCustomer?.name}`,
         'success'
       );
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error creating rental:', error);
       toast({
         title: 'Erro',
         description: 'Falha ao criar aluguel.',
@@ -526,12 +530,11 @@ const Rentals: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="startDate">Data Início *</Label>
-                <Input
-                  id="startDate"
-                  type="date"
-                  value={formData.startDate}
-                  onChange={(e) => handleFormChange('startDate', e.target.value)}
-                  className={formErrors.startDate ? 'border-destructive' : ''}
+                <DatePicker
+                  date={formData.startDate ? parseISO(formData.startDate) : undefined}
+                  setDate={(date) => handleFormChange('startDate', date ? format(date, 'yyyy-MM-dd') : '')}
+                  className={formErrors.startDate ? 'border-destructive w-full' : 'w-full'}
+                  placeholder="Selecione a data"
                 />
                 {formErrors.startDate && (
                   <p className="text-xs text-destructive">{formErrors.startDate}</p>
@@ -539,12 +542,11 @@ const Rentals: React.FC = () => {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="endDate">Data Fim *</Label>
-                <Input
-                  id="endDate"
-                  type="date"
-                  value={formData.endDate}
-                  onChange={(e) => handleFormChange('endDate', e.target.value)}
-                  className={formErrors.endDate ? 'border-destructive' : ''}
+                <DatePicker
+                  date={formData.endDate ? parseISO(formData.endDate) : undefined}
+                  setDate={(date) => handleFormChange('endDate', date ? format(date, 'yyyy-MM-dd') : '')}
+                  className={formErrors.endDate ? 'border-destructive w-full' : 'w-full'}
+                  placeholder="Selecione a data"
                 />
                 {formErrors.endDate && (
                   <p className="text-xs text-destructive">{formErrors.endDate}</p>

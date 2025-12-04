@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import { CircleMenu } from '../ui/circle-menu';
 import { NavBar } from '../ui/tubelight-navbar';
 import { NAV_ITEMS } from '../../config/navigation';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,7 +26,14 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     return userRole && item.allowedRoles.includes(userRole);
   });
 
-  // Transform for TubelightNavbar
+  // Transform for CircleMenu (mobile)
+  const menuItems = filteredNavItems.map(item => ({
+    label: item.label,
+    icon: <item.icon size={16} />,
+    href: item.path
+  }));
+
+  // Transform for NavBar (desktop)
   const navItems = filteredNavItems.map(item => ({
     name: item.label,
     url: item.path,
@@ -34,8 +42,15 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 relative flex flex-col">
-      {/* Navigation Bar */}
-      <NavBar items={navItems} />
+      {/* Circle Menu - Mobile only (bottom right) */}
+      <div className="fixed bottom-6 right-6 z-50 md:hidden">
+        <CircleMenu items={menuItems} />
+      </div>
+
+      {/* Navigation Bar - Desktop only */}
+      <div className="hidden md:block">
+        <NavBar items={navItems} />
+      </div>
 
       {/* Main Content Area */}
       <motion.main

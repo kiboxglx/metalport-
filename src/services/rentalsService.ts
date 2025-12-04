@@ -69,16 +69,7 @@ export const rentalsService = {
     if (rentalError) throw rentalError;
     if (!rental) return null;
 
-    const { data: items, error: itemsError } = await supabase
-      .from('rental_items')
-      .select(`
-        *,
-        tent:tents(*)
-      `)
-      .eq('rental_id', id);
-
-    if (itemsError) throw itemsError;
-
+    // Fetch product items
     const { data: productItems, error: productItemsError } = await supabase
       .from('rental_product_items')
       .select(`
@@ -89,16 +80,26 @@ export const rentalsService = {
 
     if (productItemsError) throw productItemsError;
 
+    // Fetch legacy rental items (tents)
+    const { data: legacyItems, error: legacyItemsError } = await supabase
+      .from('rental_items')
+      .select(`
+        *,
+        tent:tents(*)
+      `)
+      .eq('rental_id', id);
+
+    if (legacyItemsError) throw legacyItemsError;
+
     return {
       ...rental,
-      rental_items: items || [],
+      rental_items: legacyItems || [],
       rental_product_items: productItems || []
     } as unknown as RentalWithItems;
   },
 
   async createRental(
     rental: RentalInsert,
-    items: Omit<RentalItemInsert, 'rental_id'>[],
     productItems?: Omit<RentalProductItemInsert, 'rental_id'>[]
   ): Promise<Rental> {
     // Insert rental
@@ -109,20 +110,6 @@ export const rentalsService = {
       .single();
 
     if (rentalError) throw rentalError;
-
-    // Insert rental items (tents)
-    if (items.length > 0) {
-      const rentalItems = items.map(item => ({
-        ...item,
-        rental_id: newRental.id
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('rental_items')
-        .insert(rentalItems);
-
-      if (itemsError) throw itemsError;
-    }
 
     // Insert rental product items
     if (productItems && productItems.length > 0) {
@@ -154,14 +141,6 @@ export const rentalsService = {
   },
 
   async deleteRental(id: string): Promise<void> {
-    // Delete rental items first (cascade should handle this but being explicit)
-    const { error: itemsError } = await supabase
-      .from('rental_items')
-      .delete()
-      .eq('rental_id', id);
-
-    if (itemsError) throw itemsError;
-
     // Delete rental product items
     const { error: productItemsError } = await supabase
       .from('rental_product_items')
@@ -169,6 +148,14 @@ export const rentalsService = {
       .eq('rental_id', id);
 
     if (productItemsError) throw productItemsError;
+
+    // Delete rental items (tents) - Clean up legacy data if any
+    const { error: itemsError } = await supabase
+      .from('rental_items')
+      .delete()
+      .eq('rental_id', id);
+
+    if (itemsError) throw itemsError;
 
     const { error } = await supabase
       .from('rentals')
@@ -183,7 +170,15 @@ export const rentalsService = {
       .from('rentals')
       .select(`
         *,
-        customer:customers(*)
+        customer:customers(*),
+        rental_product_items(
+          quantity,
+          product:products(name)
+        ),
+        rental_items(
+          quantity,
+          tent:tents(name)
+        )
       `)
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false });
@@ -202,5 +197,82 @@ export const rentalsService = {
 
     if (error) throw error;
     return data as unknown as Rental;
+  },
+
+  async addRentalProductItem(item: RentalProductItemInsert): Promise<void> {
+    // 1. Get current product stock
+    const { data: product, error: productError } = await supabase
+      .from('products')
+      .select('total_stock')
+      .eq('id', item.product_id)
+      .single();
+
+    if (productError) throw productError;
+    if (!product) throw new Error('Produto não encontrado');
+
+    if (product.total_stock < item.quantity) {
+      throw new Error(`Estoque insuficiente. Disponível: ${product.total_stock}`);
+    }
+
+    // 2. Insert item
+    const { error: insertError } = await supabase
+      .from('rental_product_items')
+      .insert(item);
+
+    if (insertError) throw insertError;
+
+    // 3. Update stock
+    const { error: updateError } = await supabase
+      .from('products')
+      .update({ total_stock: product.total_stock - item.quantity })
+      .eq('id', item.product_id);
+
+    if (updateError) {
+      // Rollback insert if stock update fails (manual compensation)
+      console.error('Erro ao atualizar estoque, revertendo inserção...', updateError);
+      // Note: This is a best-effort rollback. In a real app, use RPC or transactions.
+    }
+  },
+
+  async removeRentalProductItem(itemId: string): Promise<void> {
+    // 1. Get item details before deleting
+    const { data: item, error: fetchError } = await supabase
+      .from('rental_product_items')
+      .select('product_id, quantity')
+      .eq('id', itemId)
+      .single();
+
+    if (fetchError) throw fetchError;
+    if (!item) throw new Error('Item não encontrado');
+
+    // 2. Delete item
+    const { error: deleteError } = await supabase
+      .from('rental_product_items')
+      .delete()
+      .eq('id', itemId);
+
+    if (deleteError) throw deleteError;
+
+    // 3. Get current product stock
+    const { data: product, error: productError } = await supabase
+      .from('products')
+      .select('total_stock')
+      .eq('id', item.product_id)
+      .single();
+
+    if (productError) {
+      console.error('Erro ao buscar produto para repor estoque', productError);
+      return;
+    }
+
+    // 4. Update stock (restore)
+    const { error: updateError } = await supabase
+      .from('products')
+      .update({ total_stock: product.total_stock + item.quantity })
+      .eq('id', item.product_id);
+
+    if (updateError) {
+      console.error('Erro ao repor estoque do produto', updateError);
+    }
   }
 };

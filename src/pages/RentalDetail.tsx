@@ -8,7 +8,6 @@ import { rentalsService } from '@/services/rentalsService';
 import { RentalWithItems } from '@/types/database';
 import { format, differenceInDays, parseISO, isAfter, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import RentalChecklist from '@/components/RentalChecklist';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -20,6 +19,12 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useNotifications } from '@/contexts/NotificationsContext';
+import { AddToCalendarButton } from 'add-to-calendar-button-react';
+import { DatePicker } from '@/components/ui/date-picker';
+import { generateContractPDF, generateReceiptPDF } from '@/utils/pdfGenerator';
+
+import { useProducts } from '@/contexts/ProductsContext';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const STATUS_CONFIG: Record<string, { label: string; colorClass: string; order: number }> = {
   pending: { label: 'Pagamento Pendente', colorClass: 'bg-yellow-100 text-yellow-800', order: 0 },
@@ -51,7 +56,53 @@ const RentalDetail: React.FC = () => {
   const [installationDate, setInstallationDate] = useState('');
   const [installationTime, setInstallationTime] = useState('');
 
+  const { productsList } = useProducts();
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const [newItemQuantity, setNewItemQuantity] = useState(1);
+  const [isAddingItem, setIsAddingItem] = useState(false);
+
   const { addNotification } = useNotifications();
+
+  const handleAddItem = async () => {
+    if (!rental || !selectedProductId) return;
+
+    const product = productsList.find(p => p.id === selectedProductId);
+    if (!product) return;
+
+    try {
+      setIsAddingItem(true);
+      await rentalsService.addRentalProductItem({
+        rental_id: rental.id,
+        product_id: selectedProductId,
+        quantity: newItemQuantity,
+        unit_price: product.daily_rental_price
+      });
+
+      toast.success('Item adicionado com sucesso');
+      setSelectedProductId('');
+      setNewItemQuantity(1);
+      await loadRental(rental.id);
+    } catch (error) {
+      console.error('Error adding item:', error);
+      toast.error('Erro ao adicionar item');
+    } finally {
+      setIsAddingItem(false);
+    }
+  };
+
+  const handleRemoveItem = async (itemId: string) => {
+    if (!rental) return;
+    if (!confirm('Tem certeza que deseja remover este item?')) return;
+
+    try {
+      await rentalsService.removeRentalProductItem(itemId);
+      toast.success('Item removido com sucesso');
+      await loadRental(rental.id);
+    } catch (error) {
+      console.error('Error removing item:', error);
+      toast.error('Erro ao remover item');
+    }
+  };
 
   useEffect(() => {
     if (id) {
@@ -99,9 +150,15 @@ const RentalDetail: React.FC = () => {
         `O aluguel de ${rental.customer?.name} foi atualizado para: ${statusLabel}`,
         'info'
       );
-    } catch (error) {
+
+      // Force navigation for collecting status
+      if (newStatus === 'collecting') {
+        console.log('Navigating to finalization page...');
+        navigate(`/alugueis/${id}/finalizacao`);
+      }
+    } catch (error: any) {
       console.error('Error updating status:', error);
-      toast.error('Erro ao atualizar status');
+      toast.error(`Erro ao atualizar status: ${error.message || 'Erro desconhecido'}`);
     } finally {
       setUpdatingStatus(false);
     }
@@ -133,12 +190,6 @@ const RentalDetail: React.FC = () => {
     const currentIndex = STATUS_FLOW.indexOf(rental.status);
     if (currentIndex === -1 || currentIndex >= STATUS_FLOW.length - 1) return null;
     return STATUS_FLOW[currentIndex + 1];
-  };
-
-  const handleChecklistComplete = async () => {
-    if (!id) return;
-    await handleStatusChange('finished');
-    toast.success('Recolhimento finalizado! Aluguel concluído.');
   };
 
   // Calculate running days and values
@@ -224,7 +275,24 @@ const RentalDetail: React.FC = () => {
           </Button>
           <h1 className="text-2xl font-bold text-foreground">Proposta de Locação de Equipamentos</h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <div className="z-10">
+            <AddToCalendarButton
+              name={`Aluguel: ${rental.customer?.name}`}
+              description={`Aluguel de equipamentos. Valor Total: ${formatCurrency(rental.total_value)}`}
+              startDate={rental.start_date}
+              endDate={rental.end_date}
+              startTime="08:00"
+              endTime="18:00"
+              timeZone="America/Sao_Paulo"
+              location={rental.customer?.address || 'Endereço do Cliente'}
+              options={['Google', 'Outlook.com', 'Apple', 'Yahoo', 'iCal']}
+              buttonStyle="round"
+              label="Add Calendar"
+              size="2"
+              lightMode="bodyScheme"
+            />
+          </div>
           <Button
             variant="outline"
             onClick={() => setIsDeliveryModalOpen(true)}
@@ -233,9 +301,46 @@ const RentalDetail: React.FC = () => {
             <MapPin className="h-4 w-4" />
             Dados da Entrega
           </Button>
-          <Button variant="outline" onClick={handlePrint} className="gap-2 text-red-600 border-red-200 hover:bg-red-50">
+
+          <Button
+            variant="outline"
+            onClick={async () => {
+              const toastId = toast.loading('Gerando contrato PDF...');
+              try {
+                await generateContractPDF(rental, [...(rental.rental_items || []), ...(rental.rental_product_items || [])]);
+                toast.dismiss(toastId);
+                toast.success('Contrato gerado com sucesso!');
+              } catch (error: any) {
+                toast.dismiss(toastId);
+                console.error('Erro ao gerar PDF:', error);
+                toast.error(`Erro ao gerar PDF: ${error.message}`);
+              }
+            }}
+            className="gap-2 text-red-600 border-red-200 hover:bg-red-50"
+          >
             <FileText className="h-4 w-4" />
-            Exibir Contrato
+            Gerar Contrato PDF
+          </Button>
+
+          <Button
+            variant="outline"
+            onClick={async () => {
+              const toastId = toast.loading('Gerando recibo PDF...');
+              try {
+                const paymentMethod = rental.payment_method || 'Dinheiro';
+                await generateReceiptPDF(rental, rental.total_value, paymentMethod);
+                toast.dismiss(toastId);
+                toast.success('Recibo gerado com sucesso!');
+              } catch (error) {
+                toast.dismiss(toastId);
+                console.error('Erro ao gerar recibo:', error);
+                toast.error('Erro ao gerar recibo PDF');
+              }
+            }}
+            className="gap-2 text-blue-600 border-blue-200 hover:bg-blue-50"
+          >
+            <FileText className="h-4 w-4" />
+            Gerar Recibo PDF
           </Button>
         </div>
       </div>
@@ -248,26 +353,26 @@ const RentalDetail: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div className="flex items-start gap-2">
-                <span className="font-bold text-gray-700 min-w-[60px]">Nome:</span>
-                <span className="text-gray-900">{rental.customer?.name}</span>
+                <span className="font-bold text-gray-400 min-w-[60px]">Nome:</span>
+                <span className="text-white">{rental.customer?.name}</span>
               </div>
               <div className="flex items-start gap-2">
-                <span className="font-bold text-gray-700 min-w-[60px]">Endereço:</span>
-                <span className="text-gray-900">{rental.customer?.address || 'Não informado'}</span>
+                <span className="font-bold text-gray-400 min-w-[60px]">Endereço:</span>
+                <span className="text-white">{rental.customer?.address || 'Não informado'}</span>
               </div>
               <div className="flex items-start gap-2">
-                <span className="font-bold text-gray-700 min-w-[60px]">CPF:</span>
-                <span className="text-gray-900">{rental.customer?.cpf || rental.customer?.document || 'Não informado'}</span>
+                <span className="font-bold text-gray-400 min-w-[60px]">CPF:</span>
+                <span className="text-white">{rental.customer?.cpf || rental.customer?.document || 'Não informado'}</span>
               </div>
             </div>
             <div className="space-y-4">
               <div className="flex items-start gap-2">
-                <span className="font-bold text-gray-700 min-w-[60px]">Fone:</span>
-                <span className="text-gray-900">{rental.customer?.phone || 'Não informado'}</span>
+                <span className="font-bold text-gray-400 min-w-[60px]">Fone:</span>
+                <span className="text-white">{rental.customer?.phone || 'Não informado'}</span>
               </div>
               <div className="flex items-start gap-2">
-                <span className="font-bold text-gray-700 min-w-[60px]">RG:</span>
-                <span className="text-gray-900">{rental.customer?.rg || 'Não informado'}</span>
+                <span className="font-bold text-gray-400 min-w-[60px]">RG:</span>
+                <span className="text-white">{rental.customer?.rg || 'Não informado'}</span>
               </div>
             </div>
           </div>
@@ -277,14 +382,14 @@ const RentalDetail: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="p-4">
             <p className="text-xs font-bold text-gray-500 uppercase mb-1">QUANTIDADE DE DIÁRIAS</p>
-            <p className="text-3xl font-normal text-gray-800">{metrics?.plannedDays} Diárias</p>
+            <p className="text-3xl font-normal text-white">{metrics?.plannedDays} Diárias</p>
           </Card>
           <Card className="p-4">
             <div className="flex items-center justify-between mb-1">
               <p className="text-xs font-bold text-gray-500 uppercase">DATA INICIAL</p>
               <Calendar className="h-4 w-4 text-gray-400" />
             </div>
-            <p className="text-2xl font-normal text-gray-800">
+            <p className="text-2xl font-normal text-white">
               {format(parseISO(rental.start_date), "dd/MM/yyyy")}
             </p>
             <p className="text-xs text-green-600 mt-1">
@@ -296,7 +401,7 @@ const RentalDetail: React.FC = () => {
               <p className="text-xs font-bold text-gray-500 uppercase">DATA FINAL</p>
               <Calendar className="h-4 w-4 text-gray-400" />
             </div>
-            <p className="text-2xl font-normal text-gray-800">
+            <p className="text-2xl font-normal text-white">
               {format(parseISO(rental.end_date), "dd/MM/yyyy")}
             </p>
             <p className="text-xs text-green-600 mt-1">
@@ -308,7 +413,7 @@ const RentalDetail: React.FC = () => {
               <p className="text-xs font-bold text-gray-500 uppercase">VALOR TOTAL</p>
               <DollarSign className="h-4 w-4 text-gray-400" />
             </div>
-            <p className="text-3xl font-normal text-gray-800">
+            <p className="text-3xl font-normal text-white">
               {formatCurrency(metrics?.currentTotal || rental.total_value)}
             </p>
           </Card>
@@ -339,17 +444,18 @@ const RentalDetail: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {/* Tents */}
+
+                    {/* Legacy Items (Tents) */}
                     {rental.rental_items?.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50/50">
+                      <tr key={item.id} className="bg-white">
                         <td className="px-4 py-4">
-                          <p className="text-sm font-medium text-gray-900">{item.tent?.name}</p>
-                          <p className="text-xs text-gray-500">{item.tent?.size}</p>
+                          <p className="text-sm font-bold text-black">{item.tent?.name || 'Tenda'}</p>
+                          <p className="text-xs text-gray-500">Item legado</p>
                         </td>
-                        <td className="px-4 py-4 text-center text-sm text-gray-600">{item.quantity}</td>
-                        <td className="px-4 py-4 text-center text-sm text-gray-600">{metrics?.plannedDays}</td>
-                        <td className="px-4 py-4 text-right text-sm text-gray-600">{formatCurrency(item.unit_price)}</td>
-                        <td className="px-4 py-4 text-right text-sm text-gray-600">{formatCurrency(item.quantity * item.unit_price * (metrics?.plannedDays || 1))}</td>
+                        <td className="px-4 py-4 text-center text-sm text-black font-medium">{item.quantity}</td>
+                        <td className="px-4 py-4 text-center text-sm text-black font-medium">{metrics?.plannedDays}</td>
+                        <td className="px-4 py-4 text-right text-sm text-black font-medium">{formatCurrency(item.unit_price)}</td>
+                        <td className="px-4 py-4 text-right text-sm text-black font-bold">{formatCurrency(item.quantity * item.unit_price * (metrics?.plannedDays || 1))}</td>
                         <td className="px-4 py-4 text-center">
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-red-500">
                             <Trash2 className="h-4 w-4" />
@@ -357,40 +463,89 @@ const RentalDetail: React.FC = () => {
                         </td>
                       </tr>
                     ))}
+
                     {/* Products */}
                     {rental.rental_product_items?.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50/50">
+                      <tr key={item.id} className="bg-white">
                         <td className="px-4 py-4">
-                          <p className="text-sm font-medium text-gray-900">{item.product?.name}</p>
+                          <p className="text-sm font-bold text-black">{item.product?.name}</p>
                         </td>
-                        <td className="px-4 py-4 text-center text-sm text-gray-600">{item.quantity}</td>
-                        <td className="px-4 py-4 text-center text-sm text-gray-600">{metrics?.plannedDays}</td>
-                        <td className="px-4 py-4 text-right text-sm text-gray-600">{formatCurrency(item.unit_price)}</td>
-                        <td className="px-4 py-4 text-right text-sm text-gray-600">{formatCurrency(item.quantity * item.unit_price * (metrics?.plannedDays || 1))}</td>
+                        <td className="px-4 py-4 text-center text-sm text-black font-medium">{item.quantity}</td>
+                        <td className="px-4 py-4 text-center text-sm text-black font-medium">{metrics?.plannedDays}</td>
+                        <td className="px-4 py-4 text-right text-sm text-black font-medium">{formatCurrency(item.unit_price)}</td>
+                        <td className="px-4 py-4 text-right text-sm text-black font-bold">{formatCurrency(item.quantity * item.unit_price * (metrics?.plannedDays || 1))}</td>
                         <td className="px-4 py-4 text-center">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-red-500">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-gray-400 hover:text-red-500"
+                            onClick={() => handleRemoveItem(item.id)}
+                          >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </td>
                       </tr>
                     ))}
+                    {/* Empty State */}
+                    {(!rental.rental_items?.length && !rental.rental_product_items?.length) && (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                          Nenhum item registrado nesta locação.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
             </Card>
 
             <Card className="p-4">
-              <div className="flex items-center gap-4">
-                <Input placeholder="Selecionar Item" className="flex-1" />
-                <div className="flex items-center border rounded-md">
-                  <Button variant="ghost" size="icon" className="h-10 w-10 rounded-none border-r">-</Button>
-                  <div className="w-12 text-center font-medium">1</div>
-                  <Button variant="ghost" size="icon" className="h-10 w-10 rounded-none border-l">+</Button>
+              <div className="flex flex-col md:flex-row items-center gap-4">
+                <div className="flex-1 w-full">
+                  <Select value={selectedProductId} onValueChange={setSelectedProductId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecionar Item" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {productsList.map((product) => (
+                        <SelectItem key={product.id} value={product.id}>
+                          {product.name} ({formatCurrency(product.daily_rental_price)}/dia)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center gap-4 w-full md:w-auto">
+                  <div className="flex items-center border rounded-md">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-10 w-10 rounded-none border-r"
+                      onClick={() => setNewItemQuantity(Math.max(1, newItemQuantity - 1))}
+                    >
+                      -
+                    </Button>
+                    <div className="w-12 text-center font-medium">{newItemQuantity}</div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-10 w-10 rounded-none border-l"
+                      onClick={() => setNewItemQuantity(newItemQuantity + 1)}
+                    >
+                      +
+                    </Button>
+                  </div>
+
+                  <Button
+                    className="flex-1 md:w-auto bg-blue-600 hover:bg-blue-700 text-white"
+                    onClick={handleAddItem}
+                    disabled={isAddingItem || !selectedProductId}
+                  >
+                    {isAddingItem ? '...' : 'Adicionar'}
+                  </Button>
                 </div>
               </div>
-              <Button className="w-full mt-4 bg-gray-400 hover:bg-gray-500 text-white">
-                Adicionar Item
-              </Button>
             </Card>
           </div>
 
@@ -405,7 +560,54 @@ const RentalDetail: React.FC = () => {
                 className="w-full justify-center py-2 text-base mb-4"
               />
 
-              {nextStatus && rental.status !== 'cancelled' && rental.status !== 'collecting' && (
+              {/* Payment Button - Show when status is pending */}
+              {rental.status === 'pending' && (
+                <Button
+                  onClick={() => navigate(`/alugueis/${rental.id}/pagamento`)}
+                  className="w-full gap-2 mb-2 bg-green-600 hover:bg-green-700"
+                >
+                  Processar Pagamento
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              )}
+
+              {/* Finalization Button - Show when status is collecting */}
+              {rental.status === 'collecting' && (
+                <Button
+                  onClick={() => navigate(`/alugueis/${rental.id}/finalizacao`)}
+                  className="w-full gap-2 mb-2 bg-purple-600 hover:bg-purple-700"
+                >
+                  Finalizar Contrato
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              )}
+
+              {/* Confirmed -> Ongoing */}
+              {rental.status === 'confirmed' && (
+                <Button
+                  onClick={() => handleStatusChange('ongoing')}
+                  disabled={updatingStatus}
+                  className="w-full gap-2 mb-2 bg-blue-600 hover:bg-blue-700"
+                >
+                  Confirmar Entrega / Iniciar
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              )}
+
+              {/* Ongoing -> Collecting */}
+              {rental.status === 'ongoing' && (
+                <Button
+                  onClick={() => handleStatusChange('collecting')}
+                  disabled={updatingStatus}
+                  className="w-full gap-2 mb-2 bg-orange-600 hover:bg-orange-700"
+                >
+                  Iniciar Recolhimento
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              )}
+
+              {/* Regular status advance button (Fallback for other statuses) */}
+              {nextStatus && rental.status !== 'cancelled' && rental.status !== 'pending' && rental.status !== 'collecting' && rental.status !== 'confirmed' && rental.status !== 'ongoing' && (
                 <Button
                   onClick={() => handleStatusChange(nextStatus)}
                   disabled={updatingStatus}
@@ -416,16 +618,6 @@ const RentalDetail: React.FC = () => {
                 </Button>
               )}
             </Card>
-
-            {/* Checklist if collecting */}
-            {rental.status === 'collecting' && (
-              <Card className="p-4">
-                <RentalChecklist
-                  rentalId={rental.id}
-                  onComplete={handleChecklistComplete}
-                />
-              </Card>
-            )}
           </div>
         </div>
       </div>
@@ -466,11 +658,10 @@ const RentalDetail: React.FC = () => {
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div className="space-y-2">
                   <Label>Data Instalação:</Label>
-                  <Input
-                    type="date"
-                    value={installationDate || rental.start_date}
-                    onChange={(e) => setInstallationDate(e.target.value)}
-                    className="text-lg font-bold text-gray-700"
+                  <DatePicker
+                    date={installationDate ? parseISO(installationDate) : (rental.start_date ? parseISO(rental.start_date) : undefined)}
+                    setDate={(date) => setInstallationDate(date ? format(date, 'yyyy-MM-dd') : '')}
+                    className="text-lg font-bold text-gray-700 w-full"
                   />
                 </div>
                 <div className="space-y-2">
@@ -497,12 +688,7 @@ const RentalDetail: React.FC = () => {
                   <span className="font-bold text-sm">Itens</span>
                   <span className="font-bold text-sm">Qtd</span>
                 </div>
-                {rental.rental_items?.map(item => (
-                  <div key={item.id} className="flex justify-between items-center py-2">
-                    <span className="text-gray-600">{item.tent?.name} {item.tent?.size}</span>
-                    <span className="text-gray-800 font-medium">{item.quantity}</span>
-                  </div>
-                ))}
+
                 {rental.rental_product_items?.map(item => (
                   <div key={item.id} className="flex justify-between items-center py-2">
                     <span className="text-gray-600">{item.product?.name}</span>
@@ -523,7 +709,7 @@ const RentalDetail: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   );
 };
 

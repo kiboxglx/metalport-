@@ -51,7 +51,7 @@ export function CalendarWidget() {
                     mode="single"
                     selected={date}
                     onSelect={setDate}
-                    className="rounded-md border shadow-sm bg-background/50 backdrop-blur-sm transform scale-125 origin-top mt-8"
+                    className="rounded-md border shadow-sm bg-card transform scale-125 origin-top mt-8"
                 />
             </div>
 
@@ -71,8 +71,8 @@ export function CalendarWidget() {
                                     className="flex items-start gap-3 p-3 rounded-lg border bg-card/50 hover:bg-accent/50 transition-colors"
                                 >
                                     <div className={`p-2 rounded-full ${event.type === 'delivery'
-                                            ? 'bg-green-500/10 text-green-500'
-                                            : 'bg-orange-500/10 text-orange-500'
+                                        ? 'bg-green-500/10 text-green-500'
+                                        : 'bg-orange-500/10 text-orange-500'
                                         }`}>
                                         {event.type === 'delivery' ? (
                                             <ArrowUpRight className="w-4 h-4" />

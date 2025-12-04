@@ -303,18 +303,15 @@ export const generateContractPDF = async (contract: Contract): Promise<void> => 
   doc.text(contract.customer_name, signatureCenterX, yPos, { align: 'center' });
 
   // TESTEMUNHA
-  yPos += 20;
   doc.line(signatureX, yPos, signatureX + signatureWidth, yPos);
   yPos += 5;
   doc.setFont('helvetica', 'bold');
   doc.text('TESTEMUNHA', signatureCenterX, yPos, { align: 'center' });
 
   // Save the PDF
-  const fileName = `Contrato_${contract.contract_number}_${format(new Date(), 'yyyyMMdd')}.pdf`;
-  doc.save(fileName);
+  doc.save(`Contrato_${contract.contract_number}.pdf`);
 };
 
-// Load image helper
 const loadImage = (src: string): Promise<string> => {
   return new Promise((resolve, reject) => {
     const img = new Image();

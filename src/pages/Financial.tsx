@@ -1,16 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, AlertCircle, CheckCircle2, Clock, CreditCard, Banknote, Plus, Check } from 'lucide-react';
+import { DollarSign, AlertCircle, CheckCircle2, Clock, CreditCard, Banknote, Plus, Check, Pencil, Trash2 } from 'lucide-react';
 import { paymentsService, Payment } from '@/services/paymentsService';
 import { rentalsService } from '@/services/rentalsService';
 import { Rental } from '@/types/database';
-import { format, parseISO, isBefore, startOfDay } from 'date-fns';
+import { format, parseISO, isBefore, startOfDay, subMonths, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 type PaymentStatus = 'PAGO' | 'PENDENTE' | 'ATRASADO';
 
@@ -60,6 +71,13 @@ const Financial: React.FC = () => {
   const [rentals, setRentals] = useState<Rental[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
+  const [chartData, setChartData] = useState<any[]>([]);
+
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [paymentToDelete, setPaymentToDelete] = useState<Payment | null>(null);
 
   // Form state
   const [selectedRentalId, setSelectedRentalId] = useState<string>('');
@@ -80,6 +98,7 @@ const Financial: React.FC = () => {
       ]);
 
       // Auto-update overdue payments
+      console.log('Dados de pagamentos carregados:', paymentsData);
       const today = startOfDay(new Date());
       const updatedPayments = paymentsData.map(payment => {
         if (payment.status === 'PENDENTE' && isBefore(parseISO(payment.due_date), today)) {
@@ -90,12 +109,35 @@ const Financial: React.FC = () => {
 
       setPayments(updatedPayments);
       setRentals(rentalsData);
+      processChartData(updatedPayments);
     } catch (error) {
       console.error('Error loading financial data:', error);
       toast.error('Erro ao carregar dados financeiros');
     } finally {
       setLoading(false);
     }
+  };
+
+  const processChartData = (paymentsData: Payment[]) => {
+    const today = new Date();
+    const data = [];
+    for (let i = 5; i >= 0; i--) {
+      const date = subMonths(today, i);
+      const monthStart = startOfMonth(date);
+      const monthEnd = endOfMonth(date);
+      const monthLabel = format(date, 'MMM', { locale: ptBR }).toUpperCase();
+
+      const monthlyTotal = paymentsData
+        .filter(p => {
+          if (p.status !== 'PAGO') return false;
+          const paymentDate = p.paid_date ? parseISO(p.paid_date) : parseISO(p.due_date);
+          return isWithinInterval(paymentDate, { start: monthStart, end: monthEnd });
+        })
+        .reduce((sum, p) => sum + Number(p.amount), 0);
+
+      data.push({ name: monthLabel, total: monthlyTotal });
+    }
+    setChartData(data);
   };
 
   const handleCreatePayment = async () => {
@@ -130,6 +172,69 @@ const Financial: React.FC = () => {
       const today = format(new Date(), 'yyyy-MM-dd');
       await paymentsService.updatePaymentStatus(paymentId, 'PAGO', today);
       toast.success('Pagamento marcado como pago');
+      loadData();
+    } catch (error) {
+      console.error('Error updating payment:', error);
+      toast.error('Erro ao atualizar pagamento');
+    }
+  };
+
+  const handleDeleteClick = (payment: Payment) => {
+    setPaymentToDelete(payment);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!paymentToDelete) return;
+
+    // Optimistic update
+    const previousPayments = [...payments];
+    setPayments(payments.filter(p => p.id !== paymentToDelete.id));
+
+    try {
+      await paymentsService.deletePayment(paymentToDelete.id);
+      toast.success('Pagamento excluído com sucesso');
+      // No need to reload data if successful, as we already updated the UI
+    } catch (error: any) {
+      console.error('Error deleting payment:', error);
+      // Revert changes if failed
+      setPayments(previousPayments);
+      toast.error(`Erro ao excluir pagamento: ${error.message || 'Erro desconhecido'}`);
+    } finally {
+      setDeleteDialogOpen(false);
+      setPaymentToDelete(null);
+    }
+  };
+
+  const openEditDialog = (payment: Payment) => {
+    setEditingPayment(payment);
+    setSelectedRentalId(payment.rental_id);
+    setAmount(payment.amount.toString());
+    setDueDate(payment.due_date);
+    setMethod(payment.method);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdatePayment = async () => {
+    if (!editingPayment || !selectedRentalId || !amount || !dueDate) {
+      toast.error('Preencha todos os campos obrigatórios');
+      return;
+    }
+
+    try {
+      await paymentsService.updatePayment(editingPayment.id, {
+        rental_id: selectedRentalId,
+        amount: parseFloat(amount),
+        due_date: dueDate,
+        method,
+      });
+      toast.success('Pagamento atualizado com sucesso');
+      setIsEditDialogOpen(false);
+      setEditingPayment(null);
+      setSelectedRentalId('');
+      setAmount('');
+      setDueDate('');
+      setMethod('PIX');
       loadData();
     } catch (error) {
       console.error('Error updating payment:', error);
@@ -286,6 +391,40 @@ const Financial: React.FC = () => {
         </div>
       </div>
 
+      {/* Revenue Chart */}
+      <div className="bg-card rounded-lg md:rounded-xl shadow-sm border border-border p-4 md:p-6">
+        <h3 className="text-lg font-semibold text-foreground mb-4">Faturamento Mensal (Últimos 6 Meses)</h3>
+        <div className="h-[300px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 12 }}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 12 }}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(value) => `R$ ${value}`}
+              />
+              <Tooltip
+                formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Faturamento']}
+                cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+              />
+              <Bar
+                dataKey="total"
+                fill="#10b981"
+                radius={[4, 4, 0, 0]}
+                barSize={40}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
       {/* Filters */}
       <div className="bg-card rounded-lg md:rounded-xl shadow-sm border border-border p-4 md:p-6">
         <div className="flex flex-col sm:flex-row gap-3 md:gap-4 items-stretch sm:items-center">
@@ -349,17 +488,37 @@ const Financial: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-4 md:px-6 py-3 md:py-4">
-                      {payment.status !== 'PAGO' && (
+                      <div className="flex items-center gap-2">
+                        {payment.status !== 'PAGO' && (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => handleMarkAsPaid(payment.id)}
+                            title="Marcar como Pago"
+                            className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                          >
+                            <Check className="w-4 h-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="outline"
-                          size="sm"
-                          onClick={() => handleMarkAsPaid(payment.id)}
-                          className="gap-1"
+                          size="icon"
+                          onClick={() => openEditDialog(payment)}
+                          title="Editar"
+                          className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                         >
-                          <Check className="w-3 h-3" />
-                          Pago
+                          <Pencil className="w-4 h-4" />
                         </Button>
-                      )}
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleDeleteClick(payment)}
+                          title="Excluir"
+                          className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -374,6 +533,88 @@ const Financial: React.FC = () => {
           <p className="text-muted-foreground">Nenhum pagamento encontrado com os filtros selecionados.</p>
         </div>
       )}
+
+      {/* Edit Payment Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Pagamento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label>Aluguel</Label>
+              <Select value={selectedRentalId} onValueChange={setSelectedRentalId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um aluguel" />
+                </SelectTrigger>
+                <SelectContent>
+                  {rentals.map((rental) => (
+                    <SelectItem key={rental.id} value={rental.id}>
+                      {rental.customer?.name} - R$ {Number(rental.total_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Valor (R$)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0,00"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Data de Vencimento</Label>
+              <Input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Método de Pagamento</Label>
+              <Select value={method} onValueChange={setMethod}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PIX">PIX</SelectItem>
+                  <SelectItem value="DINHEIRO">Dinheiro</SelectItem>
+                  <SelectItem value="CARTAO">Cartão</SelectItem>
+                  <SelectItem value="BOLETO">Boleto</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={handleUpdatePayment} className="w-full">
+              Salvar Alterações
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este pagamento?
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

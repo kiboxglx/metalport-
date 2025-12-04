@@ -72,6 +72,7 @@ All colors MUST be HSL.
   }
 
   .dark {
+    color-scheme: dark;
     --background: 222 47% 2%;
     --foreground: 210 40% 98%;
 
@@ -159,4 +160,8 @@ All colors MUST be HSL.
   .animate-blob {
     animation: blob 7s infinite;
   }
+}
+
+.dark ::-webkit-calendar-picker-indicator {
+  filter: invert(1);
 }

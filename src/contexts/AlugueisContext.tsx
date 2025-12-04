@@ -16,7 +16,7 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Rental, RentalInsert, RentalItemInsert, RentalProductItemInsert, Tent, Customer, Product } from '@/types/database';
+import { Rental, RentalInsert, RentalProductItemInsert, Customer, Product } from '@/types/database';
 import { rentalsService } from '@/services/rentalsService';
 import { contractsService, ContractItem } from '@/services/contractsService';
 import { differenceInDays } from 'date-fns';
@@ -30,10 +30,8 @@ interface AlugueisContextType {
   error: string | null;
   /** Create a new rental with items and generate contract */
   addRental: (
-    rental: RentalInsert, 
-    items: Omit<RentalItemInsert, 'rental_id'>[],
+    rental: RentalInsert,
     customer?: Customer,
-    tents?: Tent[],
     productItems?: Omit<RentalProductItemInsert, 'rental_id'>[],
     products?: Product[]
   ) => Promise<Rental>;
@@ -75,36 +73,20 @@ export const AlugueisProvider: React.FC<AlugueisProviderProps> = ({ children }) 
   };
 
   const addRental = async (
-    rental: RentalInsert, 
-    items: Omit<RentalItemInsert, 'rental_id'>[],
+    rental: RentalInsert,
     customer?: Customer,
-    tents?: Tent[],
     productItems?: Omit<RentalProductItemInsert, 'rental_id'>[],
     products?: Product[]
   ): Promise<Rental> => {
-    const newRental = await rentalsService.createRental(rental, items, productItems);
-    
+    const newRental = await rentalsService.createRental(rental, productItems);
+
     // Create contract automatically
-    if (customer && (tents || products)) {
+    if (customer && products) {
       try {
         const days = differenceInDays(new Date(rental.end_date), new Date(rental.start_date)) || 1;
-        
+
         const contractItems: ContractItem[] = [];
-        
-        // Add tent items
-        if (tents) {
-          items.forEach(item => {
-            const tent = tents.find(t => t.id === item.tent_id);
-            contractItems.push({
-              name: tent?.name || 'Tenda',
-              quantity: item.quantity,
-              daily_rate: item.unit_price,
-              days: days,
-              total: item.unit_price * item.quantity * days,
-            });
-          });
-        }
-        
+
         // Add product items
         if (products && productItems) {
           productItems.forEach(item => {
@@ -137,7 +119,7 @@ export const AlugueisProvider: React.FC<AlugueisProviderProps> = ({ children }) 
         console.error('Error creating contract:', err);
       }
     }
-    
+
     await loadRentals();
     return newRental;
   };
@@ -162,14 +144,14 @@ export const AlugueisProvider: React.FC<AlugueisProviderProps> = ({ children }) 
   };
 
   return (
-    <AlugueisContext.Provider value={{ 
-      rentalsList, 
-      loading, 
+    <AlugueisContext.Provider value={{
+      rentalsList,
+      loading,
       error,
-      addRental, 
-      deleteRental, 
-      updateRentalStatus, 
-      refreshRentals 
+      addRental,
+      deleteRental,
+      updateRentalStatus,
+      refreshRentals
     }}>
       {children}
     </AlugueisContext.Provider>

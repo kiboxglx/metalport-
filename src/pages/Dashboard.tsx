@@ -7,6 +7,11 @@ import { BentoCard, BentoGrid } from "@/components/ui/bento-grid";
 import { Marquee } from "@/components/ui/marquee";
 import { Card } from "@/components/ui/card";
 import { CalendarWidget } from "@/components/dashboard/CalendarWidget";
+import { useEffect, useState } from "react";
+import { paymentsService } from "@/services/paymentsService";
+import { customersService } from "@/services/customersService";
+import { rentalsService } from "@/services/rentalsService";
+import { isSameMonth, parseISO } from "date-fns";
 
 const contracts = [
     {
@@ -110,6 +115,66 @@ const features = [
 ];
 
 export default function Dashboard() {
+    const [stats, setStats] = useState({
+        monthlyRevenue: 0,
+        newCustomers: 0,
+        pendingItems: 0
+    });
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const loadStats = async () => {
+            try {
+                const today = new Date();
+                const [payments, customers, rentals] = await Promise.all([
+                    paymentsService.getPayments(),
+                    customersService.getCustomers(),
+                    rentalsService.getRentals()
+                ]);
+
+                // Calculate Monthly Revenue (Payments with status 'PAGO' in current month)
+                const monthlyRevenue = payments
+                    .filter(p => {
+                        if (p.status !== 'PAGO') return false;
+                        const date = p.paid_date ? parseISO(p.paid_date) : parseISO(p.due_date);
+                        return isSameMonth(date, today);
+                    })
+                    .reduce((sum, p) => sum + Number(p.amount), 0);
+
+                // Calculate New Customers (Created in current month)
+                const newCustomers = customers
+                    .filter(c => c.created_at && isSameMonth(parseISO(c.created_at), today))
+                    .length;
+
+                // Calculate Pending Items (Rentals pending/awaiting or Payments pending/overdue)
+                const pendingRentals = rentals.filter(r => ['pending', 'awaiting_payment', 'collecting'].includes(r.status)).length;
+                const pendingPayments = payments.filter(p => ['PENDENTE', 'ATRASADO'].includes(p.status)).length;
+
+                // We'll use pending rentals as the main "Pending" stat for the dashboard card
+                // but we could combine them if needed
+
+                setStats({
+                    monthlyRevenue,
+                    newCustomers,
+                    pendingItems: pendingRentals
+                });
+            } catch (error) {
+                console.error("Error loading dashboard stats:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadStats();
+    }, []);
+
+    const formatCurrency = (value: number) => {
+        return new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: 'BRL',
+        }).format(value);
+    };
+
     return (
         <div className="space-y-8 p-2 md:p-4">
             {/* Header Section */}
@@ -136,7 +201,9 @@ export default function Dashboard() {
                     </div>
                     <div>
                         <p className="text-sm text-muted-foreground">Faturamento Mensal</p>
-                        <h3 className="text-2xl font-bold">R$ 45.230,00</h3>
+                        <h3 className="text-2xl font-bold">
+                            {loading ? "..." : formatCurrency(stats.monthlyRevenue)}
+                        </h3>
                     </div>
                 </Card>
                 <Card className="p-6 flex items-center gap-4 hover:bg-accent/5 transition-colors cursor-pointer border-primary/20">
@@ -144,8 +211,10 @@ export default function Dashboard() {
                         <Users className="w-6 h-6" />
                     </div>
                     <div>
-                        <p className="text-sm text-muted-foreground">Novos Clientes</p>
-                        <h3 className="text-2xl font-bold">+12</h3>
+                        <p className="text-sm text-muted-foreground">Novos Clientes (Mês)</p>
+                        <h3 className="text-2xl font-bold">
+                            {loading ? "..." : `+${stats.newCustomers}`}
+                        </h3>
                     </div>
                 </Card>
                 <Card className="p-6 flex items-center gap-4 hover:bg-accent/5 transition-colors cursor-pointer border-primary/20">
@@ -153,8 +222,10 @@ export default function Dashboard() {
                         <AlertCircle className="w-6 h-6" />
                     </div>
                     <div>
-                        <p className="text-sm text-muted-foreground">Pendências</p>
-                        <h3 className="text-2xl font-bold">3</h3>
+                        <p className="text-sm text-muted-foreground">Aluguéis Ativos/Pendentes</p>
+                        <h3 className="text-2xl font-bold">
+                            {loading ? "..." : stats.pendingItems}
+                        </h3>
                     </div>
                 </Card>
             </div>

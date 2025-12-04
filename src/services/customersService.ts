@@ -7,7 +7,7 @@ export const customersService = {
       .from('customers')
       .select('*')
       .order('created_at', { ascending: false });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -18,7 +18,7 @@ export const customersService = {
       .select('*')
       .eq('id', id)
       .maybeSingle();
-    
+
     if (error) throw error;
     return data;
   },
@@ -29,8 +29,11 @@ export const customersService = {
       .insert(customer)
       .select()
       .single();
-    
-    if (error) throw error;
+
+    if (error) {
+      console.error('Supabase createCustomer error:', error);
+      throw error;
+    }
     return data;
   },
 
@@ -41,7 +44,7 @@ export const customersService = {
       .eq('id', id)
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -51,7 +54,7 @@ export const customersService = {
       .from('customers')
       .delete()
       .eq('id', id);
-    
+
     if (error) throw error;
   },
 
@@ -59,7 +62,7 @@ export const customersService = {
     const { count, error } = await supabase
       .from('customers')
       .select('*', { count: 'exact', head: true });
-    
+
     if (error) throw error;
     return count || 0;
   }

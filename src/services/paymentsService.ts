@@ -28,7 +28,7 @@ export const paymentsService = {
       .from('payments')
       .select('*')
       .order('due_date', { ascending: false });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -39,7 +39,7 @@ export const paymentsService = {
       .select('*')
       .eq('rental_id', rentalId)
       .order('due_date', { ascending: true });
-    
+
     if (error) throw error;
     return data || [];
   },
@@ -50,7 +50,7 @@ export const paymentsService = {
       .insert(payment)
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -60,14 +60,26 @@ export const paymentsService = {
     if (paidDate) {
       updateData.paid_date = paidDate;
     }
-    
+
     const { data, error } = await supabase
       .from('payments')
       .update(updateData)
       .eq('id', id)
       .select()
       .single();
-    
+
+    if (error) throw error;
+    return data;
+  },
+
+  async updatePayment(id: string, payment: Partial<PaymentInsert>): Promise<Payment> {
+    const { data, error } = await supabase
+      .from('payments')
+      .update(payment)
+      .eq('id', id)
+      .select()
+      .single();
+
     if (error) throw error;
     return data;
   },
@@ -77,7 +89,7 @@ export const paymentsService = {
       .from('payments')
       .delete()
       .eq('id', id);
-    
+
     if (error) throw error;
   },
 
@@ -90,11 +102,11 @@ export const paymentsService = {
     const { data, error } = await supabase
       .from('payments')
       .select('amount, status');
-    
+
     if (error) throw error;
-    
+
     const payments = data || [];
-    
+
     return {
       totalReceivable: payments.reduce((sum, p) => sum + Number(p.amount), 0),
       totalPaid: payments.filter(p => p.status === 'PAGO').reduce((sum, p) => sum + Number(p.amount), 0),
