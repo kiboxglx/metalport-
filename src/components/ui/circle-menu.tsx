@@ -34,7 +34,7 @@ export const CircleMenu = ({ items }: FloatingMenuProps) => {
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.8 }}
                         transition={{ duration: 0.2 }}
-                        className="absolute bottom-16 left-1/2 -translate-x-1/2 flex flex-col gap-2 pointer-events-none items-center"
+                        className="absolute top-16 left-1/2 -translate-x-1/2 flex flex-col gap-2 pointer-events-none items-center"
                     >
                         {items.map((item, index) => (
                             <motion.a

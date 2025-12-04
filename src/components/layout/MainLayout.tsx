@@ -42,8 +42,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 relative flex flex-col">
-      {/* Circle Menu - Mobile only (bottom center) */}
-      <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 md:hidden">
+      {/* Circle Menu - Mobile only (top center) */}
+      <div className="fixed top-6 left-1/2 transform -translate-x-1/2 z-50 md:hidden">
         <CircleMenu items={menuItems} />
       </div>
 
