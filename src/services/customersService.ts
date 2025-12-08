@@ -65,6 +65,7 @@ export const customersService = {
 
     console.log("📡 Enviando para Supabase:", payload);
 
+    // Tenta enviar com todos os campos novos
     const { data, error } = await supabase
       .from('customers')
       .insert(payload)
@@ -72,12 +73,36 @@ export const customersService = {
       .single();
 
     if (error) {
-      console.error('❌ Erro Supabase createCustomer:', {
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        payload_enviado: payload
-      });
+      console.error('❌ Erro Supabase createCustomer (Tentativa 1 - Completa):', error);
+
+      // FALLBACK: Se der erro de coluna inexistente (PGRST204 ou 400), tenta enviar sem os campos novos
+      // Isso garante que o cliente seja criado mesmo se o cache estiver desatualizado
+      if (error.code === 'PGRST204' || error.code === '42703' || error.message.includes('Could not find')) {
+        console.warn('⚠️ Tentando fallback sem campos de endereço/tipo...');
+
+        const fallbackPayload = {
+          name: customerData.name,
+          document: customerData.cpf_cnpj || customerData.document,
+          email: customerData.email,
+          phone: customerData.phone_whatsapp || customerData.phone,
+          notes: customerData.notes
+        };
+
+        const { data: dataFallback, error: errorFallback } = await supabase
+          .from('customers')
+          .insert(fallbackPayload)
+          .select()
+          .single();
+
+        if (errorFallback) {
+          console.error('❌ Erro Supabase createCustomer (Tentativa 2 - Fallback):', errorFallback);
+          throw errorFallback;
+        }
+
+        console.log("✅ Cliente criado (Fallback):", dataFallback);
+        return dataFallback;
+      }
+
       throw error;
     }
 
