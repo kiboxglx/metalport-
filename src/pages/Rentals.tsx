@@ -438,7 +438,7 @@ const Rentals: React.FC = () => {
       )}
 
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Novo Aluguel</DialogTitle>
             <DialogDescription>
