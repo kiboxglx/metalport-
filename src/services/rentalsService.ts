@@ -309,9 +309,24 @@ export const rentalsService = {
       }
     }
 
+    // 2. Delete related payments (if any)
+    const { error: paymentsError } = await supabase
+      .from('payments')
+      .delete()
+      .eq('rental_id', id);
 
+    if (paymentsError) {
+      // Log warning but continue, as table might not exist or be empty
+      console.warn('Error deleting payments or table not found:', paymentsError);
+    }
 
-    // 2. Delete rental product items
+    // 3. Delete related checklist items (if any, using raw query or try catch if table missing)
+    // Since we know table might be missing, we can try robust delete or skip if confident
+    /*
+    const { error: checklistError } = await supabase.from('rental_checklist').delete().eq('rental_id', id);
+    */
+
+    // 4. Delete rental product items
     const { error: productItemsError } = await supabase
       .from('rental_product_items')
       .delete()
@@ -319,7 +334,7 @@ export const rentalsService = {
 
     if (productItemsError) throw productItemsError;
 
-    // Delete rental items (tents) - Clean up legacy data if any
+    // 5. Delete rental items (Legacy Tents)
     const { error: itemsError } = await supabase
       .from('rental_items')
       .delete()
@@ -327,6 +342,7 @@ export const rentalsService = {
 
     if (itemsError) throw itemsError;
 
+    // 6. Delete the rental itself
     const { error } = await supabase
       .from('rentals')
       .delete()
