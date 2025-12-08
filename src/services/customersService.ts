@@ -1,5 +1,19 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Customer, CustomerInsert, CustomerUpdate } from '@/types/database';
+// Importamos a tipagem do Frontend para fazer o mapeamento se necessário
+import { Client } from '@/types';
+
+// Estendendo a tipagem do banco temporariamente para incluir os campos novos
+// até que você rode o 'supabase gen types' novamente.
+interface ExtendedCustomerInsert extends CustomerInsert {
+  address_street?: string;
+  address_number?: string;
+  address_neighborhood?: string;
+  address_city?: string;
+  address_state?: string;
+  address_zip?: string;
+  type?: string;
+}
 
 export const customersService = {
   async getCustomers(): Promise<Customer[]> {
@@ -8,7 +22,10 @@ export const customersService = {
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Erro ao buscar clientes:', error);
+      throw error;
+    }
     return data || [];
   },
 
@@ -23,24 +40,70 @@ export const customersService = {
     return data;
   },
 
-  async createCustomer(customer: CustomerInsert): Promise<Customer> {
+  async createCustomer(customerData: any): Promise<Customer> {
+    console.log("🚀 Payload recebido do Form:", customerData);
+
+    // Mapeamento Inteligente: Frontend -> Backend
+    const payload: ExtendedCustomerInsert = {
+      name: customerData.name,
+      // Mapeia cpf_cnpj (frontend) para document (banco)
+      document: customerData.cpf_cnpj || customerData.document,
+      email: customerData.email,
+      // Mapeia phone_whatsapp (frontend) para phone (banco)
+      phone: customerData.phone_whatsapp || customerData.phone,
+      notes: customerData.notes,
+
+      // Mapeia os endereços (agora que criamos as colunas no Passo 1)
+      address_street: customerData.address_street,
+      address_number: customerData.address_number,
+      address_neighborhood: customerData.address_neighborhood,
+      address_city: customerData.address_city,
+      address_state: customerData.address_state,
+      address_zip: customerData.address_zip,
+      type: customerData.type || 'PF'
+    };
+
+    console.log("📡 Enviando para Supabase:", payload);
+
     const { data, error } = await supabase
       .from('customers')
-      .insert(customer)
+      .insert(payload)
       .select()
       .single();
 
     if (error) {
-      console.error('Supabase createCustomer error:', error);
+      console.error('❌ Erro Supabase createCustomer:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        payload_enviado: payload
+      });
       throw error;
     }
+
+    console.log("✅ Cliente criado:", data);
     return data;
   },
 
-  async updateCustomer(id: string, customer: CustomerUpdate): Promise<Customer> {
+  async updateCustomer(id: string, customerData: any): Promise<Customer> {
+    const payload: ExtendedCustomerInsert = {
+      name: customerData.name,
+      document: customerData.cpf_cnpj || customerData.document,
+      email: customerData.email,
+      phone: customerData.phone_whatsapp || customerData.phone,
+      notes: customerData.notes,
+      address_street: customerData.address_street,
+      address_number: customerData.address_number,
+      address_neighborhood: customerData.address_neighborhood,
+      address_city: customerData.address_city,
+      address_state: customerData.address_state,
+      address_zip: customerData.address_zip,
+      type: customerData.type
+    };
+
     const { data, error } = await supabase
       .from('customers')
-      .update(customer)
+      .update(payload)
       .eq('id', id)
       .select()
       .single();

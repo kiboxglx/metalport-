@@ -4,9 +4,19 @@ export interface Customer {
   phone: string | null;
   email: string | null;
   document: string | null;
-  address: string | null;
-  rg: string | null;
-  cpf: string | null;
+  // Address fields added via migration
+  address_street?: string | null;
+  address_number?: string | null;
+  address_neighborhood?: string | null;
+  address_city?: string | null;
+  address_state?: string | null;
+  address_zip?: string | null;
+  type?: string | null; // 'PF' | 'PJ'
+
+  // Legacy/Frontend fields (optional)
+  address?: string | null;
+  rg?: string | null;
+  cpf?: string | null;
   notes: string | null;
   created_at: string;
 }

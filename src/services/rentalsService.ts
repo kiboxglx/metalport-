@@ -102,7 +102,25 @@ export const rentalsService = {
     rental: RentalInsert,
     productItems?: Omit<RentalProductItemInsert, 'rental_id'>[]
   ): Promise<Rental> {
-    // Insert rental
+    // 1. Check stock availability for all items first
+    if (productItems && productItems.length > 0) {
+      for (const item of productItems) {
+        const { data: product, error: productError } = await supabase
+          .from('products')
+          .select('total_stock, name')
+          .eq('id', item.product_id)
+          .single();
+
+        if (productError) throw productError;
+        if (!product) throw new Error(`Produto ${item.product_id} não encontrado`);
+
+        if (product.total_stock < item.quantity) {
+          throw new Error(`Estoque insuficiente para ${product.name}. Disponível: ${product.total_stock}`);
+        }
+      }
+    }
+
+    // 2. Insert rental
     const { data: newRental, error: rentalError } = await supabase
       .from('rentals')
       .insert(rental as any)
@@ -111,7 +129,7 @@ export const rentalsService = {
 
     if (rentalError) throw rentalError;
 
-    // Insert rental product items
+    // 3. Insert rental product items and update stock
     if (productItems && productItems.length > 0) {
       const rentalProductItems = productItems.map(item => ({
         ...item,
@@ -122,13 +140,58 @@ export const rentalsService = {
         .from('rental_product_items')
         .insert(rentalProductItems);
 
-      if (productItemsError) throw productItemsError;
+      if (productItemsError) {
+        // If items fail to insert, we should ideally delete the rental (rollback-ish)
+        await supabase.from('rentals').delete().eq('id', newRental.id);
+        throw productItemsError;
+      }
+
+      // 4. Deduct stock
+      for (const item of productItems) {
+        const { data: product } = await supabase
+          .from('products')
+          .select('total_stock')
+          .eq('id', item.product_id)
+          .single();
+
+        if (product) {
+          await supabase
+            .from('products')
+            .update({ total_stock: product.total_stock - item.quantity })
+            .eq('id', item.product_id);
+        }
+      }
     }
 
     return newRental as unknown as Rental;
   },
 
   async updateRentalStatus(id: string, status: Rental['status']): Promise<Rental> {
+    // If cancelling, restore stock
+    if (status === 'cancelled') {
+      const { data: items } = await supabase
+        .from('rental_product_items')
+        .select('product_id, quantity')
+        .eq('rental_id', id);
+
+      if (items) {
+        for (const item of items) {
+          const { data: product } = await supabase
+            .from('products')
+            .select('total_stock')
+            .eq('id', item.product_id)
+            .single();
+
+          if (product) {
+            await supabase
+              .from('products')
+              .update({ total_stock: product.total_stock + item.quantity })
+              .eq('id', item.product_id);
+          }
+        }
+      }
+    }
+
     const { data, error } = await supabase
       .from('rentals')
       .update({ status })
@@ -213,7 +276,42 @@ export const rentalsService = {
   },
 
   async deleteRental(id: string): Promise<void> {
-    // Delete rental product items
+    // 1. Get rental status and items
+    const { data: rental } = await supabase
+      .from('rentals')
+      .select('status')
+      .eq('id', id)
+      .single();
+
+    // Only restore stock if rental is active (not finished or cancelled)
+    // We assume finished/cancelled already restored stock
+    if (rental && rental.status !== 'finished' && rental.status !== 'cancelled') {
+      const { data: items } = await supabase
+        .from('rental_product_items')
+        .select('product_id, quantity')
+        .eq('rental_id', id);
+
+      if (items) {
+        for (const item of items) {
+          const { data: product } = await supabase
+            .from('products')
+            .select('total_stock')
+            .eq('id', item.product_id)
+            .single();
+
+          if (product) {
+            await supabase
+              .from('products')
+              .update({ total_stock: product.total_stock + item.quantity })
+              .eq('id', item.product_id);
+          }
+        }
+      }
+    }
+
+
+
+    // 2. Delete rental product items
     const { error: productItemsError } = await supabase
       .from('rental_product_items')
       .delete()
