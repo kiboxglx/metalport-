@@ -69,6 +69,29 @@ export const productsService = {
   },
 
   async deleteProduct(id: string): Promise<void> {
+    // 1. Remove related rental_product_items first (Cascading Delete)
+    const { error: itemsError } = await supabase
+      .from('rental_product_items')
+      .delete()
+      .eq('product_id', id);
+
+    if (itemsError) {
+      console.error('Error deleting related items:', itemsError);
+      throw itemsError;
+    }
+
+    // 2. Remove related checklist items (if table exists)
+    // Note: We skip this for now as rental_checklist table was missing in previous steps, 
+    // but good to have if created later.
+    /*
+    const { error: checklistError } = await supabase
+      .from('rental_checklist')
+      .delete()
+      .eq('product_id', id);
+     if (checklistError) console.warn('Checklist delete warning:', checklistError);
+    */
+
+    // 3. Delete the product itself
     const { error } = await supabase
       .from('products')
       .delete()

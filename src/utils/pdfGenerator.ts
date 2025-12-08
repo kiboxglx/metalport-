@@ -244,11 +244,7 @@ export const generateContractPDF = async (rental: Rental, items: (RentalItem | R
         doc.setFont('helvetica', 'bold');
         doc.text(customerName.slice(0, 30), pageWidth / 2 + 20, signatureY + 10);
 
-        // Testemunha (Centralizada abaixo)
-        yPos += 30;
-        doc.setFont('helvetica', 'normal');
-        doc.line(pageWidth / 2 - 40, yPos, pageWidth / 2 + 40, yPos);
-        doc.text('TESTEMUNHA', pageWidth / 2, yPos + 5, { align: 'center' });
+
 
         // Salvar PDF via Blob
         const safeId = (rental.id && rental.id.length > 0)
