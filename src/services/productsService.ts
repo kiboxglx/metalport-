@@ -111,5 +111,8 @@ export const productsService = {
         await supabase.from('products').insert(product);
       }
     }
+
+    // Clean up debug product if it exists
+    await supabase.from('products').delete().eq('name', 'Debug Product');
   }
 };
