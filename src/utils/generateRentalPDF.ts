@@ -23,6 +23,7 @@ const COMPANY_INFO = {
   phone: '(38) 3831-1345',
   city: 'Porteirinha',
   state: 'MG',
+  cnpj: '33.438.793/0001-84',
 };
 
 /**
@@ -59,9 +60,10 @@ export const generateRentalPDF = async ({ rental, items }: RentalPDFData): Promi
   doc.text(COMPANY_INFO.name, margin, yPos + 28);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  doc.text(COMPANY_INFO.address, margin, yPos + 33);
-  doc.text(COMPANY_INFO.cityState, margin, yPos + 38);
-  doc.text(COMPANY_INFO.phone, margin, yPos + 43);
+  doc.text(`CNPJ: ${COMPANY_INFO.cnpj}`, margin, yPos + 33);
+  doc.text(COMPANY_INFO.address, margin, yPos + 38);
+  doc.text(COMPANY_INFO.cityState, margin, yPos + 43);
+  doc.text(COMPANY_INFO.phone, margin, yPos + 48);
 
   // Title on the right side
   doc.setFont('helvetica', 'bold');
