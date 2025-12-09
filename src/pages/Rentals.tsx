@@ -651,107 +651,122 @@ const Rentals: React.FC = () => {
                   }}
                   className={formErrors.endDate ? 'border-destructive w-full' : 'w-full'}
                   placeholder="Fim"
+                />
+                {formErrors.endDate && (
+                  <p className="text-xs text-destructive">{formErrors.endDate}</p>
+                )}
               </div>
+            </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label>Forma de Pagamento</Label>
-                  <Select
-                    value={formData.paymentMethod}
-                    onValueChange={(value) => handleFormChange('paymentMethod', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-background border border-border shadow-lg z-50">
-                      <SelectItem value="PIX">PIX</SelectItem>
-                      <SelectItem value="DINHEIRO">Dinheiro</SelectItem>
-                      <SelectItem value="CARTAO">Cartão</SelectItem>
-                      <SelectItem value="BOLETO">Boleto</SelectItem>
-                      <SelectItem value="TRANSFERENCIA">Transferência</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="deliveryFee">Frete (R$)</Label>
-                  <Input
-                    id="deliveryFee"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formData.deliveryFee}
-                    onChange={(e) => handleFormChange('deliveryFee', e.target.value)}
-                    placeholder="0,00"
-                  />
-                </div>
-              </div>
+            <div className="grid gap-2">
+              <Label htmlFor="notes">Observações</Label>
+              <Input
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => handleFormChange('notes', e.target.value)}
+                placeholder="Observações sobre o aluguel"
+              />
+            </div>
 
+            <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="discount">Desconto (R$)</Label>
+                <Label>Forma de Pagamento</Label>
+                <Select
+                  value={formData.paymentMethod}
+                  onValueChange={(value) => handleFormChange('paymentMethod', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background border border-border shadow-lg z-50">
+                    <SelectItem value="PIX">PIX</SelectItem>
+                    <SelectItem value="DINHEIRO">Dinheiro</SelectItem>
+                    <SelectItem value="CARTAO">Cartão</SelectItem>
+                    <SelectItem value="BOLETO">Boleto</SelectItem>
+                    <SelectItem value="TRANSFERENCIA">Transferência</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="deliveryFee">Frete (R$)</Label>
                 <Input
-                  id="discount"
+                  id="deliveryFee"
                   type="number"
                   min="0"
                   step="0.01"
-                  value={formData.discount}
-                  onChange={(e) => handleFormChange('discount', e.target.value)}
+                  value={formData.deliveryFee}
+                  onChange={(e) => handleFormChange('deliveryFee', e.target.value)}
                   placeholder="0,00"
                 />
               </div>
-
-              {/* Summary */}
-              {selectedProducts.length > 0 && formData.startDate && formData.endDate && (
-                <div className="bg-secondary/50 rounded-lg p-4 space-y-2">
-                  <h4 className="font-medium text-sm text-foreground">Resumo do Aluguel</h4>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Período Total</span>
-                    <span>{calculatedTotals.days} dias corridos</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Dias Cobrados (Seg-Sex)</span>
-                    <span className="font-medium text-primary">{calculatedTotals.chargedDays} dias (Finais de semana grátis)</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Diária total</span>
-                    <span>{formatCurrency(calculatedTotals.dailyRate)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Subtotal</span>
-                    <span>{formatCurrency(calculatedTotals.subtotal)}</span>
-                  </div>
-                  {parseFloat(formData.deliveryFee) > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Frete</span>
-                      <span>+{formatCurrency(parseFloat(formData.deliveryFee))}</span>
-                    </div>
-                  )}
-                  {parseFloat(formData.discount) > 0 && (
-                    <div className="flex justify-between text-sm text-emerald-600">
-                      <span>Desconto</span>
-                      <span>-{formatCurrency(parseFloat(formData.discount))}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between font-bold text-base border-t pt-2 mt-2">
-                    <span>Total</span>
-                    <span className="text-primary">{formatCurrency(calculatedTotals.total)}</span>
-                  </div>
-                </div>
-              )}
             </div>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => {
-                setIsAddDialogOpen(false);
-                setSelectedProducts([]);
-                setFormData(initialFormState);
-              }}>
-                Cancelar
-              </Button>
-              <Button onClick={handleAddRental} disabled={isSubmitting}>
-                <Plus className="w-4 h-4 mr-2" />
-                {isSubmitting ? 'Criando...' : 'Criar Aluguel'}
-              </Button>
-            </DialogFooter>
+            <div className="grid gap-2">
+              <Label htmlFor="discount">Desconto (R$)</Label>
+              <Input
+                id="discount"
+                type="number"
+                min="0"
+                step="0.01"
+                value={formData.discount}
+                onChange={(e) => handleFormChange('discount', e.target.value)}
+                placeholder="0,00"
+              />
+            </div>
+
+            {/* Summary */}
+            {selectedProducts.length > 0 && formData.startDate && formData.endDate && (
+              <div className="bg-secondary/50 rounded-lg p-4 space-y-2">
+                <h4 className="font-medium text-sm text-foreground">Resumo do Aluguel</h4>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Período Total</span>
+                  <span>{calculatedTotals.days} dias corridos</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Dias Cobrados (Seg-Sex)</span>
+                  <span className="font-medium text-primary">{calculatedTotals.chargedDays} dias (Finais de semana grátis)</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Diária total</span>
+                  <span>{formatCurrency(calculatedTotals.dailyRate)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span>{formatCurrency(calculatedTotals.subtotal)}</span>
+                </div>
+                {parseFloat(formData.deliveryFee) > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Frete</span>
+                    <span>+{formatCurrency(parseFloat(formData.deliveryFee))}</span>
+                  </div>
+                )}
+                {parseFloat(formData.discount) > 0 && (
+                  <div className="flex justify-between text-sm text-emerald-600">
+                    <span>Desconto</span>
+                    <span>-{formatCurrency(parseFloat(formData.discount))}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold text-base border-t pt-2 mt-2">
+                  <span>Total</span>
+                  <span className="text-primary">{formatCurrency(calculatedTotals.total)}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setIsAddDialogOpen(false);
+              setSelectedProducts([]);
+              setFormData(initialFormState);
+            }}>
+              Cancelar
+            </Button>
+            <Button onClick={handleAddRental} disabled={isSubmitting}>
+              <Plus className="w-4 h-4 mr-2" />
+              {isSubmitting ? 'Criando...' : 'Criar Aluguel'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
