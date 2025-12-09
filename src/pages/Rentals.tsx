@@ -69,6 +69,7 @@ interface NewRentalForm {
   paymentMethod: string;
   discount: string;
   deliveryFee: string;
+  duration?: string;
 }
 
 const initialFormState: NewRentalForm = {
@@ -109,13 +110,32 @@ const Rentals: React.FC = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [rentalToDelete, setRentalToDelete] = useState<Rental | null>(null);
 
+  // Helper to calculate chargeable days (excluding weekends)
+  const countBusinessDays = (start: Date, end: Date) => {
+    let count = 0;
+    const current = new Date(start);
+    while (current <= end) {
+      const dayOfWeek = current.getDay();
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) { // 0 = Sunday, 6 = Saturday
+        count++;
+      }
+      current.setDate(current.getDate() + 1);
+    }
+    return Math.max(0, count); // Ensure non-negative
+  };
+
   // Calculate totals based on selected products
   const calculatedTotals = useMemo(() => {
     if (!formData.startDate || !formData.endDate || selectedProducts.length === 0) {
-      return { dailyRate: 0, subtotal: 0, total: 0, days: 0, deliveryFee: 0 };
+      return { dailyRate: 0, subtotal: 0, total: 0, days: 0, chargedDays: 0, deliveryFee: 0 };
     }
 
-    const days = Math.max(1, differenceInDays(new Date(formData.endDate), new Date(formData.startDate)) + 1);
+    const start = new Date(formData.startDate);
+    const end = new Date(formData.endDate);
+
+    const days = Math.max(1, differenceInDays(end, start) + 1);
+    const chargedDays = countBusinessDays(start, end);
+
     const discount = parseFloat(formData.discount) || 0;
     const deliveryFee = parseFloat(formData.deliveryFee) || 0;
 
@@ -127,10 +147,10 @@ const Rentals: React.FC = () => {
       }
     });
 
-    const subtotal = dailyRate * days;
+    const subtotal = dailyRate * chargedDays; // Use chargedDays instead of total days
     const total = Math.max(0, subtotal - discount + deliveryFee);
 
-    return { dailyRate, subtotal, total, days, deliveryFee };
+    return { dailyRate, subtotal, total, days, chargedDays, deliveryFee };
   }, [selectedProducts, formData.startDate, formData.endDate, formData.discount, formData.deliveryFee, productsList]);
 
   const filteredRentals = rentalsList.filter(rental => {
@@ -527,26 +547,85 @@ const Rentals: React.FC = () => {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="startDate">Data Início *</Label>
                 <DatePicker
                   date={formData.startDate ? parseISO(formData.startDate) : undefined}
-                  setDate={(date) => handleFormChange('startDate', date ? format(date, 'yyyy-MM-dd') : '')}
+                  setDate={(date) => {
+                    const newStartDate = date ? format(date, 'yyyy-MM-dd') : '';
+                    let updates: any = { startDate: newStartDate };
+
+                    // If we have both dates, update duration
+                    if (newStartDate && formData.endDate) {
+                      const start = new Date(newStartDate);
+                      const end = new Date(formData.endDate);
+                      const diff = differenceInDays(end, start) + 1;
+                      updates.duration = diff > 0 ? diff.toString() : '1';
+                    } else if (newStartDate && formData.duration) {
+                      // Recalculate End Date based on duration
+                      const start = new Date(newStartDate);
+                      const days = parseInt(formData.duration) || 1;
+                      const newEndDate = new Date(start);
+                      newEndDate.setDate(start.getDate() + (days - 1));
+                      updates.endDate = format(newEndDate, 'yyyy-MM-dd');
+                    }
+
+                    setFormData(prev => ({ ...prev, ...updates }));
+                    if (formErrors.startDate) setFormErrors(prev => ({ ...prev, startDate: undefined }));
+                  }}
                   className={formErrors.startDate ? 'border-destructive w-full' : 'w-full'}
-                  placeholder="Selecione a data"
+                  placeholder="Início"
                 />
                 {formErrors.startDate && (
                   <p className="text-xs text-destructive">{formErrors.startDate}</p>
                 )}
               </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="duration">Duração (Dias)</Label>
+                <Input
+                  id="duration"
+                  type="number"
+                  min="1"
+                  value={formData.duration || ''}
+                  onChange={(e) => {
+                    const days = parseInt(e.target.value) || 0;
+                    let updates: any = { duration: e.target.value };
+
+                    if (days > 0 && formData.startDate) {
+                      const start = parseISO(formData.startDate);
+                      const newEndDate = new Date(start);
+                      newEndDate.setDate(start.getDate() + (days - 1));
+                      updates.endDate = format(newEndDate, 'yyyy-MM-dd');
+                    }
+
+                    setFormData(prev => ({ ...prev, ...updates }));
+                  }}
+                  placeholder="Dias"
+                />
+              </div>
+
               <div className="grid gap-2">
                 <Label htmlFor="endDate">Data Fim *</Label>
                 <DatePicker
                   date={formData.endDate ? parseISO(formData.endDate) : undefined}
-                  setDate={(date) => handleFormChange('endDate', date ? format(date, 'yyyy-MM-dd') : '')}
+                  setDate={(date) => {
+                    const newEndDate = date ? format(date, 'yyyy-MM-dd') : '';
+                    let updates: any = { endDate: newEndDate };
+
+                    if (formData.startDate && newEndDate) {
+                      const start = new Date(formData.startDate);
+                      const end = new Date(newEndDate);
+                      const diff = differenceInDays(end, start) + 1;
+                      updates.duration = diff > 0 ? diff.toString() : '';
+                    }
+
+                    setFormData(prev => ({ ...prev, ...updates }));
+                    if (formErrors.endDate) setFormErrors(prev => ({ ...prev, endDate: undefined }));
+                  }}
                   className={formErrors.endDate ? 'border-destructive w-full' : 'w-full'}
-                  placeholder="Selecione a data"
+                  placeholder="Fim"
                 />
                 {formErrors.endDate && (
                   <p className="text-xs text-destructive">{formErrors.endDate}</p>
@@ -615,8 +694,12 @@ const Rentals: React.FC = () => {
               <div className="bg-secondary/50 rounded-lg p-4 space-y-2">
                 <h4 className="font-medium text-sm text-foreground">Resumo do Aluguel</h4>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Período</span>
-                  <span>{calculatedTotals.days} dias</span>
+                  <span className="text-muted-foreground">Período Total</span>
+                  <span>{calculatedTotals.days} dias corridos</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Dias Cobrados (Seg-Sex)</span>
+                  <span className="font-medium text-primary">{calculatedTotals.chargedDays} dias (Finais de semana grátis)</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Diária total</span>
