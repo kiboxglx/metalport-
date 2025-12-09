@@ -546,10 +546,10 @@ const Rentals: React.FC = () => {
                         </Button>
                       </div>
                     );
-                value={formData.notes}
-                onChange={(e) => handleFormChange('notes', e.target.value)}
-                placeholder="Observações sobre o aluguel"
-              />
+                  })}
+                </div>
+              )}
+            </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -674,7 +674,7 @@ const Rentals: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </div >
   );
 };
 
