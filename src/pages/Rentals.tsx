@@ -550,6 +550,121 @@ const Rentals: React.FC = () => {
                 </div>
               )}
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="startDate">Data Início *</Label>
+                <DatePicker
+                  date={formData.startDate ? parseISO(formData.startDate) : undefined}
+                  setDate={(date) => {
+                    const newStartDate = date ? format(date, 'yyyy-MM-dd') : '';
+                    let updates: any = { startDate: newStartDate };
+
+                    if (newStartDate && formData.endDate) {
+                      const start = new Date(newStartDate);
+                      const end = new Date(formData.endDate);
+                      const diff = differenceInDays(end, start) + 1;
+                      updates.duration = diff > 0 ? diff.toString() : '1';
+                      updates.chargedDays = countBusinessDays(start, end).toString();
+                    } else if (newStartDate && formData.duration) {
+                      const start = new Date(newStartDate);
+                      const days = parseInt(formData.duration) || 1;
+                      const newEndDate = new Date(start);
+                      newEndDate.setDate(start.getDate() + (days - 1));
+                      const newEndDateStr = format(newEndDate, 'yyyy-MM-dd');
+                      updates.endDate = newEndDateStr;
+                      updates.chargedDays = countBusinessDays(start, newEndDate).toString();
+                    }
+
+                    setFormData(prev => ({ ...prev, ...updates }));
+                    if (formErrors.startDate) setFormErrors(prev => ({ ...prev, startDate: undefined }));
+                  }}
+                  className={formErrors.startDate ? 'border-destructive w-full' : 'w-full'}
+                  placeholder="Início"
+                />
+                {formErrors.startDate && (
+                  <p className="text-xs text-destructive">{formErrors.startDate}</p>
+                )}
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="endDate">Data Fim *</Label>
+                <DatePicker
+                  date={formData.endDate ? parseISO(formData.endDate) : undefined}
+                  setDate={(date) => {
+                    const newEndDate = date ? format(date, 'yyyy-MM-dd') : '';
+                    let updates: any = { endDate: newEndDate };
+
+                    if (formData.startDate && newEndDate) {
+                      const start = new Date(formData.startDate);
+                      const end = new Date(newEndDate);
+                      const diff = differenceInDays(end, start) + 1;
+                      updates.duration = diff > 0 ? diff.toString() : '';
+                      updates.chargedDays = countBusinessDays(start, end).toString();
+                    }
+
+                    setFormData(prev => ({ ...prev, ...updates }));
+                    if (formErrors.endDate) setFormErrors(prev => ({ ...prev, endDate: undefined }));
+                  }}
+                  className={formErrors.endDate ? 'border-destructive w-full' : 'w-full'}
+                  placeholder="Fim"
+                />
+                {formErrors.endDate && (
+                  <p className="text-xs text-destructive">{formErrors.endDate}</p>
+                )}
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="duration">Duração (Dias)</Label>
+                <Input
+                  id="duration"
+                  type="number"
+                  min="1"
+                  value={formData.duration || ''}
+                  onChange={(e) => {
+                    const days = parseInt(e.target.value) || 0;
+                    let updates: any = { duration: e.target.value };
+
+                    if (days > 0 && formData.startDate) {
+                      const start = parseISO(formData.startDate);
+                      const newEndDate = new Date(start);
+                      newEndDate.setDate(start.getDate() + (days - 1));
+                      const newEndDateStr = format(newEndDate, 'yyyy-MM-dd');
+                      updates.endDate = newEndDateStr;
+                      updates.chargedDays = countBusinessDays(start, newEndDate).toString();
+                    }
+
+                    setFormData(prev => ({ ...prev, ...updates }));
+                  }}
+                  placeholder="Total"
+                  title="Dias corridos totais"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="chargedDays">Dias Cobrados</Label>
+                <Input
+                  id="chargedDays"
+                  type="number"
+                  min="0"
+                  value={formData.chargedDays || ''}
+                  onChange={(e) => {
+                    // Allow manual override
+                    setFormData(prev => ({ ...prev, chargedDays: e.target.value }));
+                  }}
+                  placeholder="Cobrar"
+                  title="Dias efetivamente cobrados (exclui finais de semana automaticamente, mas pode ser editado)"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="notes">Observações</Label>
+              <Input
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => handleFormChange('notes', e.target.value)}
+                placeholder="Observações sobre o aluguel"
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -599,58 +714,58 @@ const Rentals: React.FC = () => {
             </div>
 
             {/* Summary */}
-              {selectedProducts.length > 0 && formData.startDate && formData.endDate && (
-                <div className="bg-secondary/50 rounded-lg p-4 space-y-2">
-                  <h4 className="font-medium text-sm text-foreground">Resumo do Aluguel</h4>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Período Total</span>
-                    <span>{calculatedTotals.days} dias corridos</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Dias Cobrados (Seg-Sex)</span>
-                    <span className="font-medium text-primary">{calculatedTotals.chargedDays} dias (Finais de semana grátis)</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Diária total</span>
-                    <span>{formatCurrency(calculatedTotals.dailyRate)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Subtotal</span>
-                    <span>{formatCurrency(calculatedTotals.subtotal)}</span>
-                  </div>
-                  {parseFloat(formData.deliveryFee) > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Frete</span>
-                      <span>+{formatCurrency(parseFloat(formData.deliveryFee))}</span>
-                    </div>
-                  )}
-                  {parseFloat(formData.discount) > 0 && (
-                    <div className="flex justify-between text-sm text-emerald-600">
-                      <span>Desconto</span>
-                      <span>-{formatCurrency(parseFloat(formData.discount))}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between font-bold text-base border-t pt-2 mt-2">
-                    <span>Total</span>
-                    <span className="text-primary">{formatCurrency(calculatedTotals.total)}</span>
-                  </div>
+            {selectedProducts.length > 0 && formData.startDate && formData.endDate && (
+              <div className="bg-secondary/50 rounded-lg p-4 space-y-2">
+                <h4 className="font-medium text-sm text-foreground">Resumo do Aluguel</h4>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Período Total</span>
+                  <span>{calculatedTotals.days} dias corridos</span>
                 </div>
-              )}
-            </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Dias Cobrados (Seg-Sex)</span>
+                  <span className="font-medium text-primary">{calculatedTotals.chargedDays} dias (Finais de semana grátis)</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Diária total</span>
+                  <span>{formatCurrency(calculatedTotals.dailyRate)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span>{formatCurrency(calculatedTotals.subtotal)}</span>
+                </div>
+                {parseFloat(formData.deliveryFee) > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Frete</span>
+                    <span>+{formatCurrency(parseFloat(formData.deliveryFee))}</span>
+                  </div>
+                )}
+                {parseFloat(formData.discount) > 0 && (
+                  <div className="flex justify-between text-sm text-emerald-600">
+                    <span>Desconto</span>
+                    <span>-{formatCurrency(parseFloat(formData.discount))}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold text-base border-t pt-2 mt-2">
+                  <span>Total</span>
+                  <span className="text-primary">{formatCurrency(calculatedTotals.total)}</span>
+                </div>
+              </div>
+            )}
+          </div>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => {
-                setIsAddDialogOpen(false);
-                setSelectedProducts([]);
-                setFormData(initialFormState);
-              }}>
-                Cancelar
-              </Button>
-              <Button onClick={handleAddRental} disabled={isSubmitting}>
-                <Plus className="w-4 h-4 mr-2" />
-                {isSubmitting ? 'Criando...' : 'Criar Aluguel'}
-              </Button>
-            </DialogFooter>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setIsAddDialogOpen(false);
+              setSelectedProducts([]);
+              setFormData(initialFormState);
+            }}>
+              Cancelar
+            </Button>
+            <Button onClick={handleAddRental} disabled={isSubmitting}>
+              <Plus className="w-4 h-4 mr-2" />
+              {isSubmitting ? 'Criando...' : 'Criar Aluguel'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
