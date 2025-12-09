@@ -127,37 +127,6 @@ const Rentals: React.FC = () => {
 
   // Calculate totals based on selected products
   const calculatedTotals = useMemo(() => {
-    if (!formData.startDate || !formData.endDate || selectedProducts.length === 0) {
-      return { dailyRate: 0, subtotal: 0, total: 0, days: 0, chargedDays: 0, deliveryFee: 0 };
-    }
-
-    const start = new Date(formData.startDate);
-    const end = new Date(formData.endDate);
-
-    const days = Math.max(1, differenceInDays(end, start) + 1);
-    const chargedDays = countBusinessDays(start, end);
-
-    const discount = parseFloat(formData.discount) || 0;
-    const deliveryFee = parseFloat(formData.deliveryFee) || 0;
-
-    let dailyRate = 0;
-    selectedProducts.forEach(sp => {
-      const product = productsList.find(p => p.id === sp.productId);
-      if (product) {
-        dailyRate += product.daily_rental_price * sp.quantity;
-      }
-    });
-
-    const subtotal = dailyRate * chargedDays; // Use chargedDays instead of total days
-    const total = Math.max(0, subtotal - discount + deliveryFee);
-
-    return { dailyRate, subtotal, total, days, chargedDays, deliveryFee };
-  }, [selectedProducts, formData.startDate, formData.endDate, formData.discount, formData.deliveryFee, productsList]);
-
-  const filteredRentals = rentalsList.filter(rental => {
-    const matchesSearch =
-      (rental.customer?.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (rental.notes && rental.notes.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesStatus = statusFilter === 'TODOS' || rental.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -543,95 +512,8 @@ const Rentals: React.FC = () => {
                         </Button>
                       </div>
                     );
-                  })}
+                )}
                 </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="startDate">Data Início *</Label>
-                <DatePicker
-                  date={formData.startDate ? parseISO(formData.startDate) : undefined}
-                  setDate={(date) => {
-                    const newStartDate = date ? format(date, 'yyyy-MM-dd') : '';
-                    let updates: any = { startDate: newStartDate };
-
-                    // If we have both dates, update duration
-                    if (newStartDate && formData.endDate) {
-                      const start = new Date(newStartDate);
-                      const end = new Date(formData.endDate);
-                      const diff = differenceInDays(end, start) + 1;
-                      updates.duration = diff > 0 ? diff.toString() : '1';
-                    } else if (newStartDate && formData.duration) {
-                      // Recalculate End Date based on duration
-                      const start = new Date(newStartDate);
-                      const days = parseInt(formData.duration) || 1;
-                      const newEndDate = new Date(start);
-                      newEndDate.setDate(start.getDate() + (days - 1));
-                      updates.endDate = format(newEndDate, 'yyyy-MM-dd');
-                    }
-
-                    setFormData(prev => ({ ...prev, ...updates }));
-                    if (formErrors.startDate) setFormErrors(prev => ({ ...prev, startDate: undefined }));
-                  }}
-                  className={formErrors.startDate ? 'border-destructive w-full' : 'w-full'}
-                  placeholder="Início"
-                />
-                {formErrors.startDate && (
-                  <p className="text-xs text-destructive">{formErrors.startDate}</p>
-                )}
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="duration">Duração (Dias)</Label>
-                <Input
-                  id="duration"
-                  type="number"
-                  min="1"
-                  value={formData.duration || ''}
-                  onChange={(e) => {
-                    const days = parseInt(e.target.value) || 0;
-                    let updates: any = { duration: e.target.value };
-
-                    if (days > 0 && formData.startDate) {
-                      const start = parseISO(formData.startDate);
-                      const newEndDate = new Date(start);
-                      newEndDate.setDate(start.getDate() + (days - 1));
-                      updates.endDate = format(newEndDate, 'yyyy-MM-dd');
-                    }
-
-                    setFormData(prev => ({ ...prev, ...updates }));
-                  }}
-                  placeholder="Dias"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="endDate">Data Fim *</Label>
-                <DatePicker
-                  date={formData.endDate ? parseISO(formData.endDate) : undefined}
-                  setDate={(date) => {
-                    const newEndDate = date ? format(date, 'yyyy-MM-dd') : '';
-                    let updates: any = { endDate: newEndDate };
-
-                    if (formData.startDate && newEndDate) {
-                      const start = new Date(formData.startDate);
-                      const end = new Date(newEndDate);
-                      const diff = differenceInDays(end, start) + 1;
-                      updates.duration = diff > 0 ? diff.toString() : '';
-                    }
-
-                    setFormData(prev => ({ ...prev, ...updates }));
-                    if (formErrors.endDate) setFormErrors(prev => ({ ...prev, endDate: undefined }));
-                  }}
-                  className={formErrors.endDate ? 'border-destructive w-full' : 'w-full'}
-                  placeholder="Fim"
-                />
-                {formErrors.endDate && (
-                  <p className="text-xs text-destructive">{formErrors.endDate}</p>
-                )}
-              </div>
             </div>
 
             <div className="grid gap-2">
