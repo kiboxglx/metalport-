@@ -70,6 +70,7 @@ interface NewRentalForm {
   discount: string;
   deliveryFee: string;
   duration?: string;
+  chargedDays?: string;
 }
 
 const initialFormState: NewRentalForm = {
